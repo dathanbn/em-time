@@ -1,6 +1,6 @@
 import { defineConfig, minimal2023Preset } from '@vite-pwa/assets-generator/config';
 
-const background = '#F4F9FE';
+const background = '#6EB8F2';
 
 // icon.svg is full-bleed on the app background with all content inside the central 80%,
 // so no icon needs extra padding.

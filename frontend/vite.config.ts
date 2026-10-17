@@ -51,13 +51,13 @@ export default defineConfig({
       manifest: {
         name: 'Em Time',
         short_name: 'Em Time',
-        description: 'A calm focus timer.',
+        description: 'Your little sky for focus.',
         start_url: './#/timer',
         scope: './',
         display: 'standalone',
         orientation: 'any',
-        background_color: '#F4F9FE',
-        theme_color: '#F4F9FE',
+        background_color: '#8CC8F5',
+        theme_color: '#4FA8EE',
         icons: [
           { src: 'pwa-64x64.png', sizes: '64x64', type: 'image/png', purpose: 'any' },
           { src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },

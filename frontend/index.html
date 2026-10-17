@@ -4,30 +4,37 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>Em Time</title>
-    <meta name="theme-color" content="#F4F9FE" />
+    <meta name="theme-color" content="#4FA8EE" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Em Time" />
     <link rel="icon" href="favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="apple-touch-icon-180x180.png" />
     <script>
-      // Apply the saved theme before first paint so dark mode never flashes light.
-      try {
-        var d = JSON.parse(localStorage.getItem('em-time:data') || 'null');
-        if (d && d.settings && d.settings.theme === 'dark') {
-          document.documentElement.setAttribute('data-theme', 'dark');
-          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#0B1220');
-        }
-      } catch (e) {}
+      // First paint matches the coming sky: polarity and background by the local clock.
+      (function () {
+        var d = new Date();
+        var m = d.getHours() * 60 + d.getMinutes();
+        var light = m >= 315 && m < 1020;
+        try {
+          var s = JSON.parse(localStorage.getItem('em-time:data') || 'null');
+          var t = s && s.settings && s.settings.theme;
+          if (t === 'dark') light = false;
+          else if (t === 'light') light = true;
+        } catch (e) {}
+        var r = document.documentElement;
+        r.setAttribute('data-theme', light ? 'light' : 'dark');
+      })();
     </script>
     <style>
       html,
       body {
         margin: 0;
-        background-color: #f4f9fe;
+        background-color: #8cc8f5;
         color: #13202f;
         font-family:
+          ui-rounded,
           system-ui,
           -apple-system,
           'Segoe UI',
@@ -35,7 +42,7 @@
       }
       html[data-theme='dark'],
       html[data-theme='dark'] body {
-        background-color: #0b1220;
+        background-color: #16244d;
       }
       #boot {
         position: fixed;
@@ -48,15 +55,19 @@
   </head>
   <body>
     <div id="boot" aria-hidden="true">
-      <svg width="64" height="64" viewBox="0 0 24 24">
-        <circle cx="12" cy="12" r="8.5" fill="none" stroke="#dceefc" stroke-width="2.4" />
-        <path
-          d="M12 3.5a8.5 8.5 0 1 1-8.2 6.3"
-          fill="none"
-          stroke="#7db8ec"
-          stroke-width="2.4"
-          stroke-linecap="round"
-        />
+      <svg width="72" height="54" viewBox="0 0 120 90">
+        <g fill="#fff" stroke="#a9d2f2" stroke-width="5" stroke-linejoin="round">
+          <circle cx="34" cy="52" r="20" />
+          <circle cx="58" cy="38" r="26" />
+          <circle cx="84" cy="48" r="20" />
+          <rect x="14" y="48" width="92" height="30" rx="15" />
+        </g>
+        <g fill="#fff">
+          <circle cx="34" cy="52" r="20" />
+          <circle cx="58" cy="38" r="26" />
+          <circle cx="84" cy="48" r="20" />
+          <rect x="14" y="48" width="92" height="30" rx="15" />
+        </g>
       </svg>
     </div>
     <div id="app"></div>
