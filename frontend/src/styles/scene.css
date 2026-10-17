@@ -1,0 +1,484 @@
+/* ---- scene: sky, sun, moon, clouds, stars, hills, stickers (design.md section 2 and 4) ---- */
+.scene {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  contain: strict;
+  background: linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 55%, var(--sky-horizon) 100%);
+}
+.scene__stars {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: var(--sky-star-opacity);
+  visibility: var(--sky-star-vis, hidden);
+}
+.star {
+  animation: twinkle 4s ease-in-out infinite;
+}
+@media (max-width: 899px) {
+  /* Phone: only 16 stars, so make each one read as a star rather than a speck. */
+  circle.star {
+    stroke: #fff;
+    stroke-width: 1.3px;
+  }
+  path.star {
+    transform: scale(2.4);
+  }
+}
+@keyframes twinkle {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.sun,
+.moon {
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+.sun {
+  display: var(--sky-sun-display);
+  width: var(--sky-sun-size);
+  height: var(--sky-sun-size);
+  opacity: var(--sky-sun-opacity);
+  transform: translate(
+    calc(var(--sky-sun-x) - var(--sky-sun-size) / 2),
+    calc(var(--sky-sun-y) - var(--sky-sun-size) / 2)
+  );
+}
+.moon {
+  display: var(--sky-moon-display);
+  width: var(--sky-moon-size);
+  height: var(--sky-moon-size);
+  opacity: var(--sky-moon-opacity);
+  transform: translate(
+    calc(var(--sky-moon-x) - var(--sky-moon-size) / 2),
+    calc(var(--sky-moon-y) - var(--sky-moon-size) / 2)
+  );
+}
+.sun__glow,
+.moon__glow {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 320%;
+  height: 320%;
+  margin: -160% 0 0 -160%;
+  border-radius: 50%;
+  opacity: 0.55; /* keeps the halo from washing out cards and the timer ring */
+}
+.sun__glow {
+  background: radial-gradient(circle, var(--sky-sun-glow), transparent 70%);
+}
+.moon__glow {
+  background: radial-gradient(circle, var(--sky-moon-glow), transparent 70%);
+}
+.sun__body {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--sky-sun-inner), var(--sky-sun-outer) 70%);
+}
+.sun__rays {
+  position: absolute;
+  left: -25%;
+  top: -25%;
+  width: 150%;
+  height: 150%;
+  fill: var(--sky-sun-outer);
+  opacity: 0.7;
+  animation: spin-slow 90s linear infinite;
+}
+@keyframes spin-slow {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.moon__svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.cloud {
+  position: absolute;
+  left: 0;
+  width: var(--cw);
+  opacity: calc(var(--sky-cloud-opacity) * var(--cm));
+  animation: cloud-drift linear infinite;
+  will-change: transform;
+}
+.cloud svg {
+  width: 100%;
+  height: auto;
+}
+@media (max-width: 899px) {
+  .cloud {
+    width: var(--cwn);
+  }
+}
+@keyframes cloud-drift {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100vw);
+  }
+}
+
+.hills {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: clamp(84px, 18vh, 170px);
+}
+
+/* drifting stickers */
+.stickerlayer {
+  position: absolute;
+  inset: 0;
+}
+.sticker {
+  position: absolute;
+  left: 0;
+  top: var(--y);
+  font-size: var(--sticker-size);
+  line-height: 1;
+  opacity: 0.9;
+  animation: sticker-drift var(--dur) linear forwards;
+  will-change: transform;
+}
+.sticker__in {
+  display: block;
+  animation:
+    sticker-bob 3.2s ease-in-out infinite alternate,
+    sticker-tilt 5s ease-in-out infinite alternate;
+}
+@keyframes sticker-drift {
+  from {
+    transform: translateX(var(--from));
+  }
+  to {
+    transform: translateX(var(--to));
+  }
+}
+@keyframes sticker-bob {
+  from {
+    translate: 0 -10px;
+  }
+  to {
+    translate: 0 10px;
+  }
+}
+@keyframes sticker-tilt {
+  from {
+    rotate: -8deg;
+  }
+  to {
+    rotate: 8deg;
+  }
+}
+
+/* completion burst (overlay layer) */
+.burst {
+  position: fixed;
+  z-index: 90;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+.burst__s {
+  position: absolute;
+  left: 0;
+  top: 0;
+  margin: -18px 0 0 -18px;
+  font-size: 34px;
+  line-height: 1;
+  animation: burst 1400ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  will-change: transform, opacity;
+}
+@keyframes burst {
+  0% {
+    opacity: 0;
+    transform: translate(var(--sx, 0px), var(--sy, 0px)) scale(0.4) rotate(0deg);
+  }
+  10% {
+    opacity: 1;
+  }
+  35% {
+    transform: translate(var(--dx), var(--dy)) scale(1.15) rotate(var(--rot, 0deg));
+  }
+  60% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(calc(var(--dx) * 1.1), calc(var(--dy) * 1.1)) scale(0.9) rotate(var(--rot, 0deg));
+  }
+}
+.burst--still .burst__s {
+  transform: translate(var(--dx), var(--dy));
+  animation: burst-still 2400ms linear both;
+}
+@keyframes burst-still {
+  0% {
+    opacity: 0;
+  }
+  8%,
+  88% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .burst--still .burst__s {
+    animation: burst-still 2400ms linear both !important;
+    animation-duration: 2400ms !important;
+  }
+  .cloud {
+    transform: translateX(var(--rx));
+  }
+}
+
+/* ---- the cloud friend (design.md section 3) ---- */
+.mascot {
+  display: block;
+  flex: none;
+  overflow: visible;
+  pointer-events: none;
+}
+.mascot--mirror {
+  transform: scaleX(-1);
+}
+.m-eyes,
+.m-mouth,
+.m-limbs,
+.m-blush,
+.m-lamp,
+.m-orbit,
+.m-sparkles {
+  display: none;
+}
+.m-blush {
+  opacity: 0.8;
+}
+.mascot[data-state='celebrate'] .m-blush,
+.mascot[data-state='wave'] .m-blush {
+  opacity: 0.95;
+}
+
+/* face, per pose (by day: ordinary eyes; with the headlamp on: wide, alert eyes) */
+.mascot[data-state='idle'][data-accessory='none'] .m-eyes--open,
+.mascot[data-state='break'] .m-eyes--open,
+.mascot[data-state='idle'][data-accessory='headlamp'] .m-eyes--wide,
+.mascot[data-state='focusing'][data-accessory='headlamp'] .m-eyes--wide,
+.mascot[data-state='focusing'][data-accessory='none'] .m-eyes--focus,
+.mascot[data-state='celebrate'] .m-eyes--happy,
+.mascot[data-state='thumbs'] .m-eyes--happy,
+.mascot[data-state='wave'] .m-eyes--wave,
+.mascot[data-state='shrug'] .m-eyes--confused,
+.mascot[data-state='idle'][data-accessory='none'] .m-mouth--idle,
+.mascot[data-state='break'] .m-mouth--idle,
+.mascot[data-state='idle'][data-accessory='headlamp'] .m-mouth--wide,
+.mascot[data-state='focusing'][data-accessory='headlamp'] .m-mouth--wide,
+.mascot[data-state='focusing'][data-accessory='none'] .m-mouth--focus,
+.mascot[data-state='celebrate'] .m-mouth--open,
+.mascot[data-state='thumbs'] .m-mouth--open,
+.mascot[data-state='wave'] .m-mouth--wave,
+.mascot[data-state='shrug'] .m-mouth--confused,
+.mascot[data-state='idle'][data-accessory='none'] .m-blush,
+.mascot[data-state='break'] .m-blush,
+.mascot[data-state='celebrate'] .m-blush,
+.mascot[data-state='thumbs'] .m-blush,
+.mascot[data-state='wave'] .m-blush,
+/* limbs and props */
+.mascot[data-state='idle'][data-accessory='none'] .m-limbs--idle,
+.mascot[data-state='idle'][data-accessory='headlamp'] .m-limbs--alert,
+.mascot[data-state='focusing'] .m-limbs--focus,
+.mascot[data-state='break'] .m-limbs--break,
+.mascot[data-state='celebrate'] .m-limbs--celebrate,
+.mascot[data-state='wave'] .m-limbs--love,
+.mascot[data-state='shrug'] .m-limbs--shrug,
+.mascot[data-state='thumbs'] .m-limbs--thumbs,
+.mascot[data-accessory='headlamp'] .m-lamp,
+.mascot[data-state='celebrate'] .m-sparkles,
+.mascot[data-accessory='headlamp'][data-state='break'] .m-orbit,
+.mascot[data-accessory='headlamp'][data-state='celebrate'] .m-orbit {
+  display: inline;
+}
+
+/* blink: the only time the eyes close */
+.m-blink {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: m-blink 4.5s infinite;
+}
+.m-blink--slow {
+  animation-duration: 6s;
+}
+@keyframes m-blink {
+  0%,
+  95.5%,
+  100% {
+    transform: scaleY(1);
+  }
+  97.7% {
+    transform: scaleY(0.1);
+  }
+}
+
+/* motion per state */
+.mascot[data-state='idle'] .m-motion,
+.mascot[data-state='wave'] .m-motion {
+  animation: m-float 3.6s ease-in-out infinite alternate;
+}
+.mascot[data-state='focusing'] .m-motion {
+  animation: m-float-calm 6s ease-in-out infinite alternate;
+}
+.mascot[data-state='focusing'] .m-drift {
+  animation: m-drift 18s ease-in-out infinite alternate;
+}
+.mascot[data-state='break'] .m-motion {
+  transform-origin: 80px 118px;
+  animation: m-sway 5s ease-in-out infinite alternate;
+}
+.mascot[data-state='celebrate'] .m-motion {
+  transform-origin: 80px 118px;
+  animation: m-bounce 1.6s ease-out both;
+}
+@keyframes m-float {
+  to {
+    transform: translateY(-6px);
+  }
+}
+@keyframes m-float-calm {
+  to {
+    transform: translateY(-4px);
+  }
+}
+@keyframes m-drift {
+  from {
+    transform: translateX(-10px);
+  }
+  to {
+    transform: translateX(10px);
+  }
+}
+@keyframes m-sway {
+  from {
+    transform: rotate(-3deg);
+  }
+  to {
+    transform: rotate(3deg);
+  }
+}
+@keyframes m-bounce {
+  0%,
+  100% {
+    transform: translateY(0) scale(1, 1);
+  }
+  15% {
+    transform: translateY(-18px) scale(0.96, 1.06);
+  }
+  30% {
+    transform: translateY(0) scale(1.08, 0.92);
+  }
+  45% {
+    transform: translateY(-12px) scale(1, 1);
+  }
+  60% {
+    transform: translateY(0) scale(1.04, 0.96);
+  }
+  75% {
+    transform: translateY(-6px) scale(1, 1);
+  }
+  90% {
+    transform: translateY(0) scale(1, 1);
+  }
+}
+.mascot[data-state='idle'] .m-armwave {
+  transform-origin: 128px 100px;
+  animation: m-wave 700ms ease-in-out 3;
+}
+@keyframes m-wave {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(-16deg);
+  }
+}
+.m-lamp__bulb {
+  animation: m-lamp 2.4s ease-in-out infinite alternate;
+}
+@keyframes m-lamp {
+  from {
+    opacity: 0.7;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.m-orbit__spin {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: m-orbit 8s linear infinite;
+}
+@keyframes m-orbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.m-sp {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: m-pop 420ms var(--em-ease-spring) both;
+}
+.m-sp--2 {
+  animation-delay: 120ms;
+}
+.m-sp--3 {
+  animation-delay: 240ms;
+}
+@keyframes m-pop {
+  from {
+    transform: scale(0);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .m-orbit__spin {
+    transform: rotate(-60deg);
+  }
+}
+
+/* decorative copies that never move: nav glyph and empty-state mascots */
+.mascot--still,
+.mascot--still * {
+  animation: none !important;
+}
+.nav__brand .mascot {
+  margin: -4px 0;
+}
+.empty .mascot {
+  flex: none;
+}

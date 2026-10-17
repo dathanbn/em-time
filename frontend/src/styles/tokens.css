@@ -1,15 +1,49 @@
-/* Design tokens: names fixed by docs/contract.md section 8, values from docs/design.md. */
+/* Design tokens: names fixed by docs/contract.md sections 8 and V2.8, values from docs/design.md v2.
+   --sky-* are rewritten on <html> once a minute by platform/sky.ts; the values here are the
+   midday defaults so the very first paint already has a sky. */
 :root {
   color-scheme: light;
 
-  /* surfaces */
-  --em-bg: #f4f9fe;
-  --em-bg-grad-top: #f4f9fe;
-  --em-bg-grad-bottom: #ffffff;
-  --em-surface: #ffffff;
-  --em-surface-sunk: #eef3f8;
-  --em-border: rgba(19, 32, 47, 0.08);
-  --em-scrim: rgba(19, 32, 47, 0.32);
+  /* sky (scene), midday defaults */
+  --sky-top: #4fa8ee;
+  --sky-mid: #8cc8f5;
+  --sky-horizon: #d6eefc;
+  --sky-hill-back: #bfe6d9;
+  --sky-hill-front: #9fd6c6;
+  --sky-ink: #10263f;
+  --sky-ink-shadow: rgba(255, 255, 255, 0.5);
+  --sky-sun-inner: #fffdf0;
+  --sky-sun-outer: #ffe07a;
+  --sky-sun-glow: rgba(255, 244, 190, 0.65);
+  --sky-moon-glow: rgba(150, 170, 255, 0);
+  --sky-sun-x: 50vw;
+  --sky-sun-y: 300px;
+  --sky-sun-size: 88px;
+  --sky-sun-opacity: 1;
+  --sky-sun-display: block;
+  --sky-moon-x: 50vw;
+  --sky-moon-y: 300px;
+  --sky-moon-size: 64px;
+  --sky-moon-opacity: 0;
+  --sky-moon-display: none;
+  --sky-cloud-fill: #ffffff;
+  --sky-cloud-opacity: 1;
+  --sky-star-opacity: 0;
+
+  /* surfaces (light polarity) */
+  --em-bg: var(--sky-mid);
+  --em-bg-grad-top: var(--sky-top);
+  --em-bg-grad-bottom: var(--sky-horizon);
+  --em-glass: rgba(255, 255, 255, 0.72);
+  --em-glass-hi: rgba(255, 255, 255, 0.8);
+  --em-nav-glass: rgba(255, 255, 255, 0.92);
+  --em-glass-border: rgba(255, 255, 255, 0.85);
+  --em-surface: rgba(255, 255, 255, 0.9);
+  --em-surface-solid: rgba(255, 255, 255, 0.97);
+  --em-surface-sunk: rgba(238, 243, 248, 0.95);
+  --em-blur: 18px;
+  --em-border: rgba(19, 32, 47, 0.09);
+  --em-scrim: rgba(15, 30, 55, 0.36);
 
   /* ink */
   --em-ink: #13202f;
@@ -19,21 +53,22 @@
   /* accent */
   --em-accent: #8cc4f0;
   --em-accent-soft: #dceefc;
-  --em-accent-text: #1f6fb2;
+  --em-accent-text: #1a62a0;
   --em-on-accent: #0f2236;
-  --em-focus-ring: #1f6fb2;
+  --em-focus-ring: #0f416f;
+  --em-focus-halo: #ffffff;
 
   /* timer ring */
-  --em-ring-track: #e4eef8;
-  --em-ring-fill: #7db8ec;
-  --em-ring-glow: rgba(125, 184, 236, 0.35);
+  --em-ring-track: #dceefc;
+  --em-ring-fill: #6fb3ec;
+  --em-ring-glow: rgba(111, 179, 236, 0.45);
 
   /* feedback */
   --em-danger: #b42318;
-  --em-danger-soft: #fdecea;
+  --em-danger-soft: rgba(253, 236, 234, 0.95);
 
-  /* nav while a focus phase runs: muted ink instead of opacity */
-  --em-nav-muted: #5b6b82;
+  /* nav while a focus phase runs: muted ink on glass */
+  --em-nav-muted: #475569;
 
   /* chart chrome */
   --em-grid: #e6edf5;
@@ -56,19 +91,29 @@
   --em-cat-7: #6250d6;
   --em-cat-8: #e34948;
 
+  /* mascot */
+  --mascot-fill: #ffffff;
+  --mascot-line: #111111;
+  --mascot-shade: #dceefc;
+  --mascot-ink: #111111;
+  --mascot-blush: #f7a8b8;
+
   /* type */
-  --em-font-sans: 'Inter Variable', system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --em-fs-xs: 0.75rem;
-  --em-fs-sm: 0.875rem;
-  --em-fs-md: 1rem;
-  --em-fs-lg: 1.25rem;
-  --em-fs-xl: 1.5rem;
-  --em-fs-stat: 2rem;
-  --em-fs-timer: clamp(64px, 16vw, 112px);
-  --em-fw-light: 300;
-  --em-fw-regular: 400;
-  --em-fw-medium: 500;
-  --em-fw-semibold: 600;
+  --em-font-sans: 'Nunito Variable', ui-rounded, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --em-fs-xs: 13px;
+  --em-fs-sm: 15px;
+  --em-fs-md: 17px;
+  --em-fs-lg: 21px;
+  --em-fs-section: 22px;
+  --em-fs-greet: 24px;
+  --em-fs-xl: 30px;
+  --em-fs-stat: 34px;
+  --em-fs-timer: clamp(68px, 19vw, 124px);
+  --em-fw-light: 500;
+  --em-fw-regular: 500;
+  --em-fw-medium: 600;
+  --em-fw-semibold: 700;
+  --em-fw-heavy: 800;
 
   /* space (4px base) */
   --em-space-1: 4px;
@@ -82,15 +127,16 @@
   --em-space-9: 96px;
 
   /* radii */
-  --em-radius-sm: 8px;
-  --em-radius-md: 12px;
-  --em-radius-lg: 20px;
+  --em-radius-sm: 12px;
+  --em-radius-md: 18px;
+  --em-radius-lg: 28px;
   --em-radius-pill: 999px;
 
   /* shadows */
-  --em-shadow-sm: 0 1px 2px rgba(19, 32, 47, 0.04), 0 1px 1px rgba(19, 32, 47, 0.03);
-  --em-shadow-md: 0 4px 16px rgba(31, 111, 178, 0.06), 0 1px 3px rgba(19, 32, 47, 0.05);
-  --em-shadow-lg: 0 12px 40px rgba(31, 111, 178, 0.08), 0 2px 6px rgba(19, 32, 47, 0.05);
+  --em-shadow-sm: 0 2px 6px rgba(31, 111, 178, 0.1);
+  --em-shadow-md: 0 8px 24px rgba(31, 111, 178, 0.14), 0 1px 3px rgba(19, 32, 47, 0.06);
+  --em-shadow-lg: 0 16px 44px rgba(31, 111, 178, 0.18), 0 2px 6px rgba(19, 32, 47, 0.06);
+  --em-play-shadow: 0 8px 20px rgba(79, 168, 238, 0.35);
 
   /* motion */
   --em-dur-fast: 120ms;
@@ -98,51 +144,59 @@
   --em-dur-slow: 320ms;
   --em-dur-refill: 600ms;
   --em-dur-breath: 4000ms;
+  --em-dur-flip: 600ms;
   --em-ease-standard: cubic-bezier(0.2, 0, 0, 1);
   --em-ease-in: cubic-bezier(0.4, 0, 1, 1);
   --em-ease-breath: cubic-bezier(0.45, 0, 0.55, 1);
+  --em-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 
   /* layout */
-  --em-nav-h: 64px;
+  --em-nav-h: 72px;
   --em-content-max: 1120px;
   --em-gutter: 16px;
+  --sticker-size: 26px;
 }
 
 @media (min-width: 900px) {
   :root {
     --em-gutter: 32px;
+    --em-fs-greet: 26px;
+    --sticker-size: 30px;
   }
 }
 
 :root[data-theme='dark'] {
   color-scheme: dark;
 
-  --em-bg: #0b1220;
-  --em-bg-grad-top: #0f1a2c;
-  --em-bg-grad-bottom: #0b1220;
-  --em-surface: #121b2b;
-  --em-surface-sunk: #0e1625;
-  --em-border: rgba(156, 211, 245, 0.1);
+  --em-glass: rgba(18, 27, 43, 0.78);
+  --em-glass-hi: rgba(18, 27, 43, 0.86);
+  --em-nav-glass: rgba(18, 27, 43, 0.92);
+  --em-glass-border: rgba(156, 211, 245, 0.16);
+  --em-surface: rgba(18, 27, 43, 0.88);
+  --em-surface-solid: rgba(18, 27, 43, 0.95);
+  --em-surface-sunk: rgba(14, 22, 37, 0.92);
+  --em-border: rgba(156, 211, 245, 0.12);
   --em-scrim: rgba(0, 0, 0, 0.55);
 
   --em-ink: #e6eef7;
   --em-ink-2: #a9b8cc;
-  --em-ink-3: #8394ab;
+  --em-ink-3: #8c9db4;
 
   --em-accent: #9cd3f5;
   --em-accent-soft: #1d3550;
   --em-accent-text: #9cd3f5;
   --em-on-accent: #0b1220;
   --em-focus-ring: #9cd3f5;
+  --em-focus-halo: #0b1220;
 
-  --em-ring-track: #1c2a40;
+  --em-ring-track: #1d3550;
   --em-ring-fill: #9cd3f5;
-  --em-ring-glow: rgba(156, 211, 245, 0.3);
+  --em-ring-glow: rgba(156, 211, 245, 0.35);
 
   --em-danger: #f4a6a0;
-  --em-danger-soft: #3a1e24;
+  --em-danger-soft: rgba(58, 30, 36, 0.92);
 
-  --em-nav-muted: #8394ab;
+  --em-nav-muted: #a9b8cc;
 
   --em-grid: #1e2a3d;
   --em-axis: #2e3d55;
@@ -162,7 +216,45 @@
   --em-cat-7: #9085e9;
   --em-cat-8: #e66767;
 
-  --em-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-  --em-shadow-md: 0 6px 20px rgba(0, 0, 0, 0.35);
-  --em-shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.45);
+  --mascot-fill: #eaf2ff;
+  --mascot-line: #9fd8ff;
+  --mascot-shade: #c9d2f0;
+  --mascot-ink: #111111;
+  --mascot-blush: #f7a8b8;
+
+  --em-shadow-sm: 0 2px 6px rgba(0, 0, 0, 0.3);
+  --em-shadow-md: 0 8px 28px rgba(0, 0, 0, 0.38);
+  --em-shadow-lg: 0 18px 52px rgba(0, 0, 0, 0.48);
+  --em-play-shadow: 0 8px 20px rgba(156, 211, 245, 0.25);
+}
+
+/* No backdrop-filter: make glass and cards more opaque so text contrast still holds. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  :root {
+    --em-glass: rgba(255, 255, 255, 0.9);
+    --em-glass-hi: rgba(255, 255, 255, 0.94);
+    --em-surface: rgba(255, 255, 255, 0.97);
+  }
+  :root[data-theme='dark'] {
+    --em-glass: rgba(18, 27, 43, 0.9);
+    --em-glass-hi: rgba(18, 27, 43, 0.94);
+    --em-surface: rgba(18, 27, 43, 0.97);
+  }
+}
+
+@media (forced-colors: active) {
+  :root {
+    --em-glass: Canvas;
+    --em-glass-hi: Canvas;
+    --em-nav-glass: Canvas;
+    --em-surface: Canvas;
+    --em-surface-solid: Canvas;
+    --em-surface-sunk: Canvas;
+    --em-glass-border: CanvasText;
+    --em-border: CanvasText;
+    --em-ink: CanvasText;
+    --em-ink-2: CanvasText;
+    --em-ink-3: CanvasText;
+    --sky-ink: CanvasText;
+  }
 }

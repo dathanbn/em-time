@@ -1,10 +1,10 @@
-/* Inter Variable, latin subset only, self-hosted via @fontsource-variable/inter. */
+/* Nunito Variable, latin subset only, self-hosted via @fontsource-variable/nunito. */
 @font-face {
-  font-family: 'Inter Variable';
+  font-family: 'Nunito Variable';
   font-style: normal;
   font-display: swap;
-  font-weight: 100 900;
-  src: url('@fontsource-variable/inter/files/inter-latin-wght-normal.woff2') format('woff2-variations');
+  font-weight: 200 1000;
+  src: url('@fontsource-variable/nunito/files/nunito-latin-wght-normal.woff2') format('woff2-variations');
   unicode-range:
     U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
     U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
@@ -20,6 +20,7 @@ html {
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
   scroll-padding-top: calc(var(--em-nav-h) + 16px);
+  background-color: var(--em-bg);
 }
 
 body {
@@ -31,10 +32,7 @@ body {
   line-height: 1.5;
   font-weight: var(--em-fw-regular);
   color: var(--em-ink);
-  background-color: var(--em-bg);
-  background-image: linear-gradient(180deg, var(--em-bg-grad-top), var(--em-bg-grad-bottom));
-  background-attachment: fixed;
-  background-repeat: no-repeat;
+  background-color: transparent;
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
 }
@@ -83,9 +81,11 @@ svg {
   display: block;
 }
 
+/* Two-tone focus indicator: readable on every sky stop and every surface. */
 :focus-visible {
   outline: 2px solid var(--em-focus-ring);
   outline-offset: 2px;
+  box-shadow: 0 0 0 4px var(--em-focus-halo);
 }
 
 .sr-only {
@@ -107,7 +107,7 @@ svg {
   z-index: 200;
   padding: 10px 16px;
   border-radius: var(--em-radius-md);
-  background: var(--em-surface);
+  background: var(--em-surface-solid);
   color: var(--em-accent-text);
   box-shadow: var(--em-shadow-lg);
 }
@@ -151,6 +151,16 @@ kbd {
   color: var(--em-ink-2);
 }
 
+/* Page hidden: every scene, mascot and sticker animation pauses (SKY-15). */
+html[data-hidden] .scene *,
+html[data-hidden] .mascot,
+html[data-hidden] .mascot *,
+html[data-hidden] .sticker,
+html[data-hidden] .sticker *,
+html[data-hidden] .burst * {
+  animation-play-state: paused !important;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -159,6 +169,13 @@ kbd {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+  .scene *,
+  .mascot,
+  .mascot *,
+  .sticker,
+  .sticker * {
+    animation: none !important;
   }
   .view {
     animation: view-in 120ms linear;
@@ -169,6 +186,9 @@ kbd {
 }
 
 @media (forced-colors: active) {
+  .scene {
+    display: none;
+  }
   .ring__arc,
   .gring__fill {
     stroke: Highlight;
