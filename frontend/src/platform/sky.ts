@@ -118,7 +118,7 @@ export const SKY_KEYFRAMES: readonly SkyKeyframe[] = [
 export const POLARITY_FLIP_MIN = { toLight: 315, toDark: 1020 } as const;
 export const SKY_INK = { dark: '#10263F', light: '#FFFFFF' } as const;
 /** Label ink on clear glass (v5): navy, or the near-white of the dark theme. */
-export const GLASS_INK = { navy: '#10263F', white: '#EEF5FF' } as const;
+const GLASS_INK = { navy: '#10263F', white: '#EEF5FF' } as const;
 
 /** Pinned clocks for the fixed theme modes: 12:30 and 02:30. */
 const PIN_LIGHT = 750;

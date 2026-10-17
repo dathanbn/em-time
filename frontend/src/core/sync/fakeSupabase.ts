@@ -22,7 +22,7 @@ export interface FakeServer {
   gate: Promise<void> | null;
 }
 
-export interface Op {
+interface Op {
   kind: 'upsert' | 'select' | 'getSession' | 'signInWithPassword' | 'signUp' | 'signOut';
   table?: SyncTable;
   rows?: Array<Record<string, unknown>>;
@@ -70,7 +70,7 @@ export interface FakeClient {
   signOutCalls: Array<{ scope?: string } | undefined>;
 }
 
-export function createFakeClient(server: FakeServer): FakeClient {
+function createFakeClient(server: FakeServer): FakeClient {
   let session: SessionLike | null = null;
   const listeners = new Set<(event: string, s: SessionLike | null) => void>();
   const signOutCalls: FakeClient['signOutCalls'] = [];

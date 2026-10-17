@@ -92,7 +92,7 @@ export function reset(): void {
   announce('Reset');
 }
 
-export function elapsedMs(): number {
+function elapsedMs(): number {
   const s = timerState.value;
   return s.plannedMs - core.timer.remainingMs();
 }

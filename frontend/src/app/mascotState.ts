@@ -5,8 +5,8 @@ import type { MascotState } from '../components/Mascot';
 import { readLastWaveDay, writeLastWaveDay } from '../platform/uiMemory';
 import { timerState } from './coreBridge';
 
-export const celebrating = signal(false);
-export const waving = signal(false);
+const celebrating = signal(false);
+const waving = signal(false);
 
 let celebrateTimer = 0;
 let waveTimer = 0;
@@ -25,7 +25,7 @@ export function wave(): void {
 
 // Daily goal met: thumbs up for about 3 seconds. Never while a focus session is running or while
 // the celebrate pose is still playing; it waits for the next break or idle moment.
-export const thumbing = signal(false);
+const thumbing = signal(false);
 const THUMBS_MS = 3000;
 let thumbPending = false;
 let thumbTimer = 0;

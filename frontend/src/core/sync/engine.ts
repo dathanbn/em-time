@@ -53,7 +53,7 @@ export async function loadSupabaseFactory(): Promise<SupabaseFactory> {
 }
 
 /** Real clock, timers and browser events. Browser globals are guarded so Node can import this. */
-export function createDefaultSyncDeps(): SyncDeps {
+function createDefaultSyncDeps(): SyncDeps {
   const hasWindow = typeof window !== 'undefined' && typeof window.addEventListener === 'function';
   return {
     now: () => Date.now(),
