@@ -34,6 +34,32 @@ test.describe('PWA-1 installable', () => {
     expect(sizes).toEqual(expect.arrayContaining(['192x192:any', '512x512:any', '512x512:maskable']));
   });
 
+  test('PWA-1 (v2) the manifest carries the sky palette and the new description; the icon is the cloud friend on light blue', async ({ page, request }) => {
+    await boot(page);
+    const manifestUrl = new URL('/em-time/manifest.webmanifest', page.url()).toString();
+    const m = await (await request.get(manifestUrl)).json();
+    expect(m.theme_color.toUpperCase()).toBe('#4FA8EE');
+    expect(m.background_color.toUpperCase()).toBe('#8CC8F5');
+    expect(m.description).toBe('Your little sky for focus.');
+    // the 512 icon: a light-blue field with a white cloud (sampled from the decoded PNG through a canvas)
+    const px = await page.evaluate(async (src) => {
+      const img = new Image();
+      img.src = src;
+      await img.decode();
+      const c = document.createElement('canvas');
+      c.width = c.height = 512;
+      const g = c.getContext('2d')!;
+      g.drawImage(img, 0, 0, 512, 512);
+      const at = (x: number, y: number) => [...g.getImageData(x, y, 1, 1).data].slice(0, 3);
+      return { corner: at(20, 20), cloud: at(256, 250), low: at(20, 490) };
+    }, new URL('/em-time/maskable-icon-512x512.png', page.url()).toString());
+    // corners are light blue (blue channel high, red lower), the cloud body is near white
+    expect(px.corner[2]).toBeGreaterThan(200);
+    expect(px.corner[0]).toBeLessThan(px.corner[2]! - 40);
+    expect(Math.min(...px.cloud)).toBeGreaterThan(225);
+    expect(px.low[2]).toBeGreaterThan(220);
+  });
+
   test('every manifest icon and the apple-touch-icon exist, are PNGs, and have the size they claim', async ({ page, request }) => {
     await boot(page);
     const manifestUrl = new URL('/em-time/manifest.webmanifest', page.url()).toString();

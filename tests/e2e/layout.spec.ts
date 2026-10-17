@@ -1,6 +1,7 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 import { MIN, boot, fixture, go, isMobile } from './helpers';
+import { contrast, over, parseColor, type RGB, type RGBA } from '../unit/colorMath';
 
 type Route = 'timer' | 'tasks' | 'stats' | 'settings';
 const ROUTES: Route[] = ['timer', 'tasks', 'stats', 'settings'];
@@ -23,7 +24,14 @@ const noHScroll = (page: Page) =>
         const cs = getComputedStyle(el);
         if (cs.position === 'fixed' || cs.visibility === 'hidden' || cs.display === 'none') return false;
         const r = el.getBoundingClientRect();
-        return r.width > 0 && r.right > window.innerWidth + 1;
+        if (!(r.width > 0 && r.right > window.innerWidth + 1)) return false;
+        // an element whose overflow is clipped by an ancestor that itself fits the viewport cannot cause a scroll
+        // (the sky scene clips the sun glow by design; the sun glides while the viewport is resized)
+        for (let a = el.parentElement; a && a !== document.documentElement; a = a.parentElement) {
+          const ov = getComputedStyle(a).overflowX;
+          if ((ov === 'hidden' || ov === 'clip') && a !== document.body && a.getBoundingClientRect().right <= window.innerWidth + 1) return false;
+        }
+        return true;
       })
       .slice(0, 8)
       .map((el) => `${el.tagName.toLowerCase()}.${String(el.className).slice(0, 40)} right=${Math.round(el.getBoundingClientRect().right)}`),
@@ -182,50 +190,34 @@ test.describe('A11Y-5 touch targets on the phone layout', () => {
 });
 
 // ---------------------------------------------------------------- A11Y-1 contrast, A11Y axe
-const STOPS = {
-  light: { dawn: ['#EEF5FC', '#FBF8F6'], day: ['#F4F9FE', '#FFFFFF'], dusk: ['#EEF3F9', '#F6F4F9'], night: ['#E8EFF9', '#F2F6FB'] },
-  dark: { dawn: ['#121B2E', '#16182A'], day: ['#0F1A2C', '#0B1220'], dusk: ['#141629', '#1A1A2C'], night: ['#070D18', '#0B1220'] },
-} as const;
+// v2: the v1 gradient-stop table is gone (UI-2 is replaced by SKY-2 to SKY-9). The proof that every
+// pair passes at every minute is the unit sweep (tests/unit/sky-contrast.test.ts); here the same
+// pairs are re-computed in the browser from the LIVE tokens and sky colours of the running page.
+const toRgb = (c: string): RGBA => parseColor(c);
 
-const lin = (c: number) => {
-  c /= 255;
-  return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
-};
-const lum = (hex: string) => {
-  const n = parseInt(hex.replace('#', '').padEnd(6, '0'), 16);
-  return 0.2126 * lin((n >> 16) & 255) + 0.7152 * lin((n >> 8) & 255) + 0.0722 * lin(n & 255);
-};
-const ratio = (a: string, b: string) => {
-  const [x, y] = [lum(a), lum(b)];
-  return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
-};
-const hex6 = (c: string) => {
-  const m = c.trim().match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
-  if (!m) throw new Error(`not a hex color: ${c}`);
-  return m[1]!.length === 3 ? `#${[...m[1]!].map((x) => x + x).join('')}` : `#${m[1]}`;
-};
-
-test.describe('A11Y-1 contrast', () => {
-  for (const theme of ['light', 'dark'] as const) {
-    test(`text tokens reach 4.5:1 on every gradient stop and surface, ${theme} theme`, async ({ page }) => {
-      await boot(page, { seed: { ...fixture('backup-valid.json'), settings: { ...fixture('backup-valid.json').settings, theme } }, clock: true });
-      const tok = await page.evaluate(() => {
+test.describe('A11Y-1 contrast (live tokens over the live sky)', () => {
+  for (const mode of ['light', 'dark'] as const) {
+    test(`ink tokens reach 4.5:1 on glass and cards over every sky colour, Always ${mode}`, async ({ page }) => {
+      await boot(page, { seed: { ...fixture('backup-valid.json'), settings: { ...fixture('backup-valid.json').settings, theme: mode } }, clock: true });
+      const t = await page.evaluate(() => {
         const cs = getComputedStyle(document.documentElement);
-        const get = (n: string) => cs.getPropertyValue(n).trim();
-        return Object.fromEntries(['ink', 'ink-2', 'ink-3', 'accent-text', 'danger', 'bg', 'surface', 'surface-sunk', 'danger-soft'].map((n) => [n, get(`--em-${n}`)]));
+        const names = ['ink', 'ink-2', 'ink-3', 'accent-text', 'danger', 'glass', 'surface', 'surface-solid'].map((n) => `--em-${n}`);
+        const sky = ['top', 'mid', 'horizon', 'hill-back', 'hill-front'].map((n) => `--sky-${n}`);
+        return Object.fromEntries([...names, ...sky].map((n) => [n, cs.getPropertyValue(n).trim()]));
       });
-      const stops = Object.values(STOPS[theme]).flat();
-      const bgs = [...stops, hex6(tok.bg!), hex6(tok.surface!), hex6(tok['surface-sunk']!)];
+      const under = ['top', 'mid', 'horizon', 'hill-back', 'hill-front'].map((n) => toRgb(t[`--sky-${n}`]!).slice(0, 3) as RGB);
       const fails: string[] = [];
-      for (const t of ['ink', 'ink-2', 'ink-3', 'accent-text'] as const)
-        for (const bg of bgs) {
-          const r = ratio(hex6(tok[t]!), bg);
-          if (r < 4.5) fails.push(`${t} ${tok[t]} on ${bg} = ${r.toFixed(2)}`);
+      const check = (fill: string, tokens: string[]) => {
+        for (const k of tokens) {
+          for (const u of under) {
+            const r = contrast(toRgb(t[k]!).slice(0, 3) as RGB, over(toRgb(t[fill]!), u));
+            if (r < 4.5) fails.push(`${k} on ${fill} over ${u.join(',')} = ${r.toFixed(2)}`);
+          }
         }
-      for (const bg of [hex6(tok.surface!), hex6(tok['danger-soft']!)]) {
-        const r = ratio(hex6(tok.danger!), bg);
-        if (r < 4.5) fails.push(`danger on ${bg} = ${r.toFixed(2)}`);
-      }
+      };
+      check('--em-surface', ['--em-ink', '--em-ink-2', '--em-ink-3', '--em-accent-text', '--em-danger']);
+      check('--em-glass', ['--em-ink', '--em-ink-2', '--em-accent-text']);
+      check('--em-surface-solid', ['--em-ink', '--em-ink-2', '--em-ink-3']);
       expect(fails).toEqual([]);
     });
   }
@@ -253,18 +245,6 @@ test.describe('A11Y axe: no violations on any screen, both themes', () => {
         await openScreen(page, route, theme);
         expect(await axe(page, { noContrast: true })).toEqual([]);
       });
-      test(`${route} (${theme}): text contrast on every gradient stop`, async ({ page }) => {
-        await openScreen(page, route, theme);
-        const problems: string[] = [];
-        for (const [period, [top, bottom]] of Object.entries(STOPS[theme])) {
-          for (const [where, color] of [['top', top], ['bottom', bottom]] as const) {
-            // axe cannot resolve a gradient, so paint each stop as a flat page background
-            await page.addStyleTag({ content: `html, body { background-image: none !important; background-color: ${color} !important; }` });
-            for (const v of await axe(page, { contrastOnly: true })) problems.push(`${period}/${where} ${color}: ${v}`);
-          }
-        }
-        expect(problems).toEqual([]);
-      });
     }
 
   for (const theme of ['light', 'dark'] as const) {
@@ -274,8 +254,9 @@ test.describe('A11Y axe: no violations on any screen, both themes', () => {
       await page.getByTestId('timer-play').click();
       await page.clock.runFor(2000);
       await page.waitForTimeout(500); // the dim is a transition
-      const flat = STOPS[theme].day[0]; // axe cannot read a gradient: paint the day stop flat
-      await page.addStyleTag({ content: `html, body { background-image: none !important; background-color: ${flat} !important; }` });
+      // axe cannot read a gradient: paint the sky mid colour flat (the glass and cards still composite over it)
+      const flat = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--sky-mid').trim());
+      await page.addStyleTag({ content: `.scene { display: none !important; } html, body { background-image: none !important; background-color: ${flat} !important; }` });
       expect(await axe(page, { contrastOnly: true })).toEqual([]);
     });
   }
@@ -296,101 +277,5 @@ test.describe('A11Y axe: no violations on any screen, both themes', () => {
     await expect(page.getByRole('dialog', { name: 'Discard this session?' })).toBeVisible();
     await page.waitForTimeout(500);
     expect(await axe(page), 'discard').toEqual([]);
-  });
-});
-
-// ---------------------------------------------------------------- UI-2 gradient
-test.describe('UI-2 time-of-day background', () => {
-  const vars = (page: Page) =>
-    page.evaluate(() => {
-      const cs = getComputedStyle(document.documentElement);
-      return [cs.getPropertyValue('--em-bg-grad-top').trim().toLowerCase(), cs.getPropertyValue('--em-bg-grad-bottom').trim().toLowerCase()];
-    });
-  const at = (h: number, m = 0) => new Date(`2026-10-14T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:30-07:00`);
-
-  for (const theme of ['light', 'dark'] as const) {
-    test(`each period shows its own stops in the ${theme} theme, exactly where no blend applies`, async ({ browser, baseURL }) => {
-      const pure: Array<[string, number, number]> = [
-        ['night', 2, 0],
-        ['dawn', 6, 0],
-        ['day', 12, 0],
-        ['dusk', 18, 0],
-        ['night', 21, 0],
-      ];
-      for (const [period, h, m] of pure) {
-        const ctx = await browser.newContext({ baseURL, timezoneId: 'America/Los_Angeles' });
-        const page = await ctx.newPage();
-        const d = fixture('backup-valid.json');
-        d.settings.theme = theme;
-        await page.clock.install({ time: at(h, m) });
-        await page.addInitScript((t: string) => localStorage.setItem('em-time:data', t), JSON.stringify(d));
-        await page.goto('?e2e#/timer');
-        await expect(page.getByTestId('nav-timer').first()).toBeVisible();
-        const [top, bottom] = STOPS[theme][period as keyof (typeof STOPS)['light']];
-        expect(await vars(page), `${period} ${h}:00 ${theme}`).toEqual([top.toLowerCase(), bottom.toLowerCase()]);
-        const image = await page.evaluate(() => getComputedStyle(document.body).backgroundImage);
-        expect(image).toContain('linear-gradient');
-        await ctx.close();
-      }
-    });
-  }
-
-  test('inside the hour before a boundary the colours move between the two periods; they are recomputed once a minute', async ({ browser, baseURL }) => {
-    const ctx = await browser.newContext({ baseURL, timezoneId: 'America/Los_Angeles' });
-    const page = await ctx.newPage();
-    await page.clock.install({ time: at(7, 59) });
-    await page.addInitScript(() => {
-      (window as any).__gradWrites = 0;
-      const orig = CSSStyleDeclaration.prototype.setProperty;
-      CSSStyleDeclaration.prototype.setProperty = function (name: string, ...rest: any[]) {
-        if (name === '--em-bg-grad-top') (window as any).__gradWrites++;
-        return (orig as any).call(this, name, ...rest);
-      };
-    });
-    await page.goto('?e2e#/timer');
-    await expect(page.getByTestId('nav-timer').first()).toBeVisible();
-    const dawn = STOPS.light.dawn.map((s) => s.toLowerCase());
-    const day = STOPS.light.day.map((s) => s.toLowerCase());
-    expect(await vars(page)).toEqual(dawn); // 07:59, the blend starts at 08:00
-    const writes0 = await page.evaluate(() => (window as any).__gradWrites as number);
-    await page.clock.runFor(5 * 60_000); // five minutes
-    const writes1 = await page.evaluate(() => (window as any).__gradWrites as number);
-    expect(writes1 - writes0).toBe(5);
-    // 08:20 and 08:40 are a third and two thirds of the way
-    const seen: string[][] = [];
-    for (const target of [20, 40]) {
-      const now = await page.evaluate(() => new Date().getMinutes());
-      await page.clock.runFor((target - now) * 60_000);
-      seen.push(await vars(page));
-    }
-    for (const colours of seen) {
-      expect(colours).not.toEqual(dawn);
-      expect(colours).not.toEqual(day);
-      for (let k = 0; k < 2; k++) for (let c = 1; c < 7; c += 2) {
-        const a = parseInt(dawn[k]!.slice(c, c + 2), 16);
-        const b = parseInt(day[k]!.slice(c, c + 2), 16);
-        const v = parseInt(colours[k]!.slice(c, c + 2), 16);
-        expect(v).toBeGreaterThanOrEqual(Math.min(a, b) - 1);
-        expect(v).toBeLessThanOrEqual(Math.max(a, b) + 1);
-      }
-    }
-    expect(seen[0]).not.toEqual(seen[1]); // moving, in the right direction
-    const bright = (c: string[]) => parseInt(c[0]!.slice(1, 3), 16) + parseInt(c[0]!.slice(3, 5), 16);
-    expect(Math.abs(bright(seen[0]!) - bright(day))).toBeGreaterThan(Math.abs(bright(seen[1]!) - bright(day)) - 1);
-    await page.clock.runFor(21 * 60_000); // 09:01
-    expect(await vars(page)).toEqual(day);
-    await ctx.close();
-  });
-
-  test('the boundaries: 04:59 is almost dawn, 05:00 is dawn; 16:59 is almost dusk, 17:00 is dusk', async ({ browser, baseURL }) => {
-    for (const [h, m, period] of [[5, 0, 'dawn'], [9, 0, 'day'], [17, 0, 'dusk'], [20, 0, 'night']] as const) {
-      const ctx = await browser.newContext({ baseURL, timezoneId: 'America/Los_Angeles' });
-      const page = await ctx.newPage();
-      await page.clock.install({ time: at(h, m) });
-      await page.goto('?e2e#/timer');
-      await expect(page.getByTestId('nav-timer').first()).toBeVisible();
-      expect(await vars(page), `${h}:${m}`).toEqual(STOPS.light[period].map((s) => s.toLowerCase()));
-      await ctx.close();
-    }
   });
 });

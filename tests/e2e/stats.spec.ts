@@ -84,7 +84,8 @@ const docWith = (sessions: any[], patch: (d: any) => void = () => undefined) => 
 const hits = (page: Page) => page.getByTestId('week-columns').locator('rect.hit');
 const cell = (page: Page, day: string) => page.locator(`[data-testid="heatmap-cell"][data-day="${day}"]`);
 const tooltip = (page: Page) => page.locator('.tooltip');
-const weekRange = (page: Page) => page.locator('#h-week + .section__sub');
+// v2 (design.md 7.3): the subtitle moved from under the section title to the first line of the chart card
+const weekRange = (page: Page) => page.locator('[aria-labelledby="h-week"] .section__sub');
 /** Scroll first and let the scroll event pass: the chart tooltip (rightly) hides on scroll. */
 const reveal = async (page: Page, loc: ReturnType<Page['locator']>) => {
   await loc.scrollIntoViewIfNeeded();
@@ -523,7 +524,7 @@ test.describe('stats: streaks and goal', () => {
     await expect(cell(page, '2026-10-15')).toHaveCount(1);
   });
 
-  test('GOAL-1 the ring shows today against the goal; the same figures are on the timer screen', async ({ page }) => {
+  test('GOAL-1 the ring shows today against the goal; the same figures are on the desktop timer card (none on the phone Timer)', async ({ page }, info) => {
     await boot(page, { seed: 'backup-valid.json', clock: true, route: 'stats' });
     const todayMin = Math.round(minutesByDay(doc()).get(TODAY)!);
     const ring = page.getByTestId('goal-ring');
@@ -532,7 +533,8 @@ test.describe('stats: streaks and goal', () => {
     await expect(ring.locator('.gring__sub')).toHaveText('of 120 min');
     await expect(page.getByTestId('today-tile')).toContainText('3 sessions today');
     await go(page, 'timer');
-    await expect(page.getByTestId('today-goal').filter({ visible: true }).first()).toContainText(String(todayMin));
+    if (info.project.name.startsWith('mobile')) await expect(page.getByTestId('today-goal').filter({ visible: true })).toHaveCount(0); // Timer simplification: no stats on the phone Timer
+    else await expect(page.getByTestId('today-goal').filter({ visible: true }).first()).toContainText(String(todayMin));
   });
 
   test('GOAL-2 at or over goal the ring is full with a check and "Goal met"; no second lap', async ({ page }) => {
@@ -556,7 +558,8 @@ test.describe('stats: streaks and goal', () => {
     await expect(page.getByTestId('goal-ring')).not.toContainText('Goal met');
   });
 
-  test('GOAL-3 a compact ring and today\'s minutes on the timer screen; they move after a session', async ({ page }) => {
+  test('GOAL-3 a compact ring and today\'s minutes on the timer screen; they move after a session (desktop; superseded on the phone, where the Timer shows no stats)', async ({ page }, info) => {
+    test.skip(info.project.name.startsWith('mobile'), 'Timer simplification: the phone Today strip was removed');
     await boot(page, { seed: docWith([sessionOf(TODAY, 8, 50)]), clock: true, stubs: true, route: 'timer' });
     const goal = page.getByTestId('today-goal').filter({ visible: true }).first();
     await expect(goal).toContainText('50');

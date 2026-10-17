@@ -214,19 +214,31 @@ test.describe('settings: iPhone notes (NTF-4, EDGE-6)', () => {
 });
 
 test.describe('settings: appearance (UI-1, week start, GOAL-1)', () => {
-  test('UI-1 the theme toggle switches and persists per device; the OS setting is never followed', async ({ page }) => {
-    await boot(page, { route: 'settings' });
-    await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
-    await page.getByTestId('settings-theme').getByRole('radio', { name: 'Dark' }).click();
-    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  test('THEME-1 (replaces UI-1) three theme choices, default Follow the sky; each persists per device; the OS setting is never followed', async ({ page }) => {
+    // 15:00 local: the sky is in its light polarity, so `data-theme` is light while the mode is `sky`
+    await boot(page, { clock: true, route: 'settings' });
+    const html = page.locator('html');
+    await expect(html).toHaveAttribute('data-theme-mode', 'sky');
+    await expect(html).toHaveAttribute('data-theme', 'light');
+    expect((await stored(page))?.settings?.theme ?? 'sky', 'nothing is written until a choice is made; the default is sky').toBe('sky');
+    for (const id of ['settings-theme-sky', 'settings-theme-light', 'settings-theme-dark']) await expect(page.getByTestId(id)).toBeVisible();
+    await expect(page.getByTestId('settings-theme-sky')).toContainText('Follow the sky');
+    await expect(page.getByTestId('settings-theme-light')).toContainText('Always light');
+    await expect(page.getByTestId('settings-theme-dark')).toContainText('Always dark');
+    await page.getByTestId('settings-theme-dark').click();
+    await expect(html).toHaveAttribute('data-theme', 'dark');
+    await expect(html).toHaveAttribute('data-theme-mode', 'dark');
     expect((await stored(page)).settings.theme).toBe('dark');
     await page.reload();
-    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
-    await page.getByTestId('settings-theme').getByRole('radio', { name: 'Light' }).click();
+    await expect(html).toHaveAttribute('data-theme', 'dark');
+    await page.getByTestId('settings-theme-light').click();
     await page.emulateMedia({ colorScheme: 'dark' });
-    await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+    await expect(html).toHaveAttribute('data-theme', 'light');
     await page.reload();
-    await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+    await expect(html).toHaveAttribute('data-theme', 'light');
+    expect((await stored(page)).settings.theme).toBe('light');
+    await page.getByTestId('settings-theme-sky').click();
+    expect((await stored(page)).settings.theme).toBe('sky');
   });
 
   test('week start select moves the Stats week and the heatmap rows', async ({ page }) => {
@@ -234,7 +246,8 @@ test.describe('settings: appearance (UI-1, week start, GOAL-1)', () => {
     await page.getByLabel('Week starts on').selectOption({ label: 'Sunday' });
     expect((await stored(page)).settings.weekStartsOn).toBe(0);
     await go(page, 'stats');
-    await expect(page.locator('#h-week + .section__sub')).toHaveText('Oct 11 to Oct 17');
+    // v2 (D-56): the range subtitle moved inside the week card, so look for it by its text
+    await expect(page.getByTestId('week-total').locator('xpath=ancestor::*[contains(@class,"card")][1]').getByText('Oct 11 to Oct 17')).toBeVisible();
     await expect(page.getByTestId('heatmap').locator('text.axis-text').filter({ hasText: /^(Sun|Tue|Thu)$/ })).toHaveText(['Sun', 'Tue', 'Thu']);
   });
 
@@ -290,7 +303,7 @@ test.describe('settings: your data (DAT-2, DAT-3, DAT-5)', () => {
     expect(name).toBe('em-time-backup-2026-10-14.json');
     const out = JSON.parse(text);
     expect(out.app).toBe('em-time');
-    expect(out.schemaVersion).toBe(1);
+    expect(out.schemaVersion).toBe(2); // v2 schema (contract V2.3)
     const doc = await stored(page);
     expect(out.sessions).toHaveLength(doc.sessions.length);
     expect(out.tasks).toHaveLength(doc.tasks.length);
@@ -412,7 +425,7 @@ test.describe('settings: your data (DAT-2, DAT-3, DAT-5)', () => {
     await dlg.getByRole('button', { name: 'Replace everything' }).click();
     await page.getByRole('dialog', { name: 'Replace everything?' }).getByRole('button', { name: 'Replace everything' }).click();
     const doc = await stored(page);
-    expect(doc.schemaVersion).toBe(1);
+    expect(doc.schemaVersion).toBe(2);
     expect(doc.sessions).toHaveLength(7);
   });
 

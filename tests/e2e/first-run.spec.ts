@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
-import { boot, go, visible } from './helpers';
+import { boot, go, isMobile, visible } from './helpers';
+import { parseColor } from '../unit/colorMath';
 
 const TOKENS = [
   '--em-bg', '--em-bg-grad-top', '--em-bg-grad-bottom', '--em-surface', '--em-surface-sunk', '--em-border', '--em-scrim',
@@ -7,6 +8,12 @@ const TOKENS = [
   '--em-ring-track', '--em-ring-fill', '--em-ring-glow', '--em-danger', '--em-danger-soft', '--em-grid', '--em-axis',
   ...[0, 1, 2, 3, 4].map((i) => `--em-heat-${i}`),
   ...[1, 2, 3, 4, 5, 6, 7, 8].map((i) => `--em-cat-${i}`),
+  // v2 additions (contract V2.8)
+  '--sky-top', '--sky-mid', '--sky-horizon', '--sky-hill-back', '--sky-hill-front', '--sky-ink', '--sky-sun-x', '--sky-sun-y', '--sky-sun-size',
+  '--sky-sun-opacity', '--sky-moon-x', '--sky-moon-y', '--sky-moon-size', '--sky-moon-opacity', '--sky-cloud-fill', '--sky-cloud-opacity', '--sky-star-opacity',
+  '--em-glass', '--em-glass-border', '--em-surface-solid', '--em-blur', '--em-focus-halo',
+  '--mascot-fill', '--mascot-line', '--mascot-shade', '--mascot-ink', '--mascot-blush',
+  '--em-fs-greet', '--em-fs-section', '--em-fw-heavy', '--sticker-size',
   '--em-font-sans', '--em-fs-xs', '--em-fs-sm', '--em-fs-md', '--em-fs-lg', '--em-fs-xl', '--em-fs-stat', '--em-fs-timer',
   '--em-fw-light', '--em-fw-regular', '--em-fw-medium', '--em-fw-semibold',
   ...[1, 2, 3, 4, 5, 6, 7, 8, 9].map((i) => `--em-space-${i}`),
@@ -21,11 +28,16 @@ async function visibleText(page: Page): Promise<string> {
 }
 
 test.describe('first run (EDGE-8, TSK-1, UI-1)', () => {
-  test('TMR-1 EDGE-8 timer screen shows "No task" with a "Pick a task" ghost button and zeroed Today', async ({ page }) => {
+  test('TMR-1 EDGE-8 timer screen shows "No task" with a "Pick a task" ghost button and zeroed Today (desktop card; the phone Timer has no stats)', async ({ page }, info) => {
     await boot(page, { clock: true });
     await expect(page.getByTestId('current-task')).toHaveText('Pick a task');
-    await expect(visible(page.getByTestId('today-goal')).first()).toContainText('0 of 120 min');
-    await expect(visible(page.getByTestId('today-goal')).first()).toContainText('0 sessions');
+    if (info.project.name.startsWith('mobile')) {
+      // Timer simplification: no Today strip on the phone Timer
+      await expect(page.getByTestId('today-goal').filter({ visible: true })).toHaveCount(0);
+    } else {
+      await expect(visible(page.getByTestId('today-goal')).first()).toContainText('0 of 120 min');
+      await expect(visible(page.getByTestId('today-goal')).first()).toContainText('0 sessions');
+    }
     await expect(page.getByTestId('message-line')).toBeEmpty();
     await expect(page.getByTestId('break-prompt')).toHaveCount(0);
   });
@@ -76,12 +88,16 @@ test.describe('first run (EDGE-8, TSK-1, UI-1)', () => {
     expect(d.sessions).toEqual([]);
   });
 
-  test('UI-1 light by default, and the OS dark preference does not switch it', async ({ page }) => {
+  test('THEME-1 (replaces UI-1) the default is Follow the sky (light polarity at 15:00), and the OS dark preference does not switch it', async ({ page }) => {
     await page.emulateMedia({ colorScheme: 'dark' });
     await boot(page, { clock: true });
+    await expect(page.locator('html')).toHaveAttribute('data-theme-mode', 'sky');
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
-    const bg = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--em-surface').trim().toLowerCase());
-    expect(['#fff', '#ffffff']).toContain(bg);
+    // Chromium may serialise the token as #ffffffe6: compare the parsed colour, not the text
+    const bg = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--em-surface').trim());
+    const [r, g, b, a] = parseColor(bg);
+    expect([r, g, b]).toEqual([255, 255, 255]);
+    expect(a).toBeCloseTo(0.9, 2);
   });
 
   test('routing: hash routes, nav clicks, deep links and the default route', async ({ page }) => {
@@ -97,7 +113,7 @@ test.describe('first run (EDGE-8, TSK-1, UI-1)', () => {
     await expect(page.getByTestId('timer-digits')).toBeVisible();
   });
 
-  test('every design token from contract section 8 exists in light and in dark', async ({ page }) => {
+  test('every design token from contract section 8 exists in light and in dark', async ({ page }, info) => {
     await boot(page, { clock: true, route: 'settings' });
     const read = () =>
       page.evaluate((names) => {
@@ -107,12 +123,12 @@ test.describe('first run (EDGE-8, TSK-1, UI-1)', () => {
     const light = await read();
     const missingLight = TOKENS.filter((t) => !light[t]);
     expect(missingLight, `missing in light: ${missingLight.join(', ')}`).toEqual([]);
-    await page.getByTestId('settings-theme').getByRole('radio', { name: 'Dark' }).click();
+    await page.getByTestId('settings-theme-dark').click();
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
     const dark = await read();
     expect(TOKENS.filter((t) => !dark[t])).toEqual([]);
     for (const t of ['--em-bg', '--em-surface', '--em-ink', '--em-accent-text', '--em-heat-4']) expect(dark[t], t).not.toBe(light[t]);
-    expect(light['--em-nav-h']).toBe('64px');
+    expect(light['--em-nav-h']).toBe(isMobile(info.project) ? '64px' : '72px'); // v2 desktop nav row 72 (design.md 6), phone tab bar 64
     expect(light['--em-content-max']).toBe('1120px');
   });
 
@@ -152,8 +168,8 @@ test.describe('SYNC-1 local-only build', () => {
     await page.clock.fastForward(26 * 60_000);
     for (const r of ['tasks', 'stats', 'settings'] as const) await go(page, r);
     await expect(page.getByTestId('sync-card')).toHaveCount(0);
-    await expect(page.getByText('Sign in to sync')).toHaveCount(0);
-    await expect(page.getByTestId('sync-email-input')).toHaveCount(0);
+    await expect(page.getByText('Link this device')).toHaveCount(0);
+    await expect(page.getByTestId('sync-code-input')).toHaveCount(0);
     await page.reload();
     await page.waitForTimeout(500);
     expect(hits, `${info.project.name}: ${hits.join(', ')}`).toEqual([]);

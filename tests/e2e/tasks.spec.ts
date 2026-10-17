@@ -189,6 +189,8 @@ test.describe('tasks', () => {
     await cur.click();
     const picker = page.getByRole('dialog', { name: 'Pick a task' });
     await expect(picker).toBeVisible();
+    // the sheet moves focus inside once it has mounted; a person cannot press Escape before that, so wait for it
+    await expect.poll(() => page.evaluate(() => !!document.activeElement?.closest('[role="dialog"]'))).toBe(true);
     await page.keyboard.press('Escape');
     await expect(picker).toHaveCount(0);
     await expect(cur).toBeFocused();
@@ -243,7 +245,9 @@ test.describe('tasks', () => {
     await first.fill('Deep work');
     await first.press('Enter');
     expect((await stored(page)).categories.find((c: any) => c.id.endsWith('01')).name).toBe('Deep work');
+    await expect(first).toHaveValue('Deep work'); // the committed rename has settled before the next edit starts
     await first.fill('');
+    await expect(first).toHaveValue('');
     await first.press('Enter');
     await expect(scope.getByText('Enter a category name.')).toBeVisible();
     await first.fill('');

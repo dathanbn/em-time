@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { MIN, boot, fixture, qa, runFocus, sessionsOf, setHidden, stored, visible } from './helpers';
+import { MIN, boot, fixture, isMobile, qa, runFocus, sessionsOf, setHidden, stored, visible } from './helpers';
 
 const digits = (p: Page) => p.getByTestId('timer-digits');
 const play = (p: Page) => p.getByTestId('timer-play');
@@ -68,7 +68,7 @@ test.describe('timer basics', () => {
     expect(s.endedAt - s.startedAt).toBeLessThan(35 * MIN + 10_000);
   });
 
-  test('TMR-3 a finished session adds exactly 25 minutes to today and to the current task', async ({ page }) => {
+  test('TMR-3 a finished session adds exactly 25 minutes to today and to the current task', async ({ page }, info) => {
     await boot(page, { clock: true });
     // pick a task from the timer screen
     await page.getByTestId('current-task').click();
@@ -79,7 +79,8 @@ test.describe('timer basics', () => {
     const sessions = await sessionsOf(page);
     expect(sessions).toHaveLength(1);
     expect(sessions[0]).toMatchObject({ plannedMs: 25 * MIN, focusedMs: 25 * MIN, day: '2026-10-14', taskName: 'Orgo chapter 7' });
-    await expect(visible(page.getByTestId('today-goal')).first()).toContainText('25 of 120 min');
+    if (isMobile(info.project)) await expect(page.getByTestId('today-goal').filter({ visible: true })).toHaveCount(0);
+    else await expect(visible(page.getByTestId('today-goal')).first()).toContainText('25 of 120 min');
     await visible(page.getByTestId('nav-tasks')).first().click();
     await expect(page.getByTestId('task-row').first()).toContainText('25m');
     await visible(page.getByTestId('nav-stats')).first().click();
@@ -114,7 +115,7 @@ test.describe('reset, skip, mode switch log nothing', () => {
     expect(await dotsOn(page)).toBe(0);
   });
 
-  test('TMR-6 skip at 1 s, 60 s and 24:59 logs nothing, goes to an idle short break and never auto-starts', async ({ page }) => {
+  test('TMR-6 skip at 1 s, 60 s and 24:59 logs nothing, goes to an idle short break and never auto-starts', async ({ page }, info) => {
     await boot(page, { clock: true });
     for (const elapsed of [1_000, 60_000, 25 * MIN - 1_000]) {
       await play(page).click();
@@ -129,7 +130,8 @@ test.describe('reset, skip, mode switch log nothing', () => {
     expect(await sessionsOf(page)).toHaveLength(0);
     expect((await timerState(page)).cycle).toBe(0);
     await expect(page.getByTestId('message-line')).toBeEmpty();
-    await expect(visible(page.getByTestId('today-goal')).first()).toContainText('0 of 120 min');
+    if (isMobile(info.project)) await expect(page.getByTestId('today-goal').filter({ visible: true })).toHaveCount(0);
+    else await expect(visible(page.getByTestId('today-goal')).first()).toContainText('0 of 120 min');
   });
 
   test('TMR-7 skip during a break goes to focus, idle, logs nothing more', async ({ page }) => {
@@ -499,19 +501,20 @@ test.describe('messages, break prompts, milestones', () => {
     await expect(page.getByTestId('break-prompt')).toHaveCount(0);
   });
 
-  test('MIL-1 MIL-2 MIL-3 MIL-4 the 10th session shows the milestone message and quiet confetti, cleared when focus starts', async ({ page }) => {
+  test('MIL-1 MIL-2 MIL-3 MIL-4 the 10th session shows the milestone message and the larger sticker burst (v2), cleared when focus starts', async ({ page }, info) => {
     const doc = fixture('backup-valid.json');
     doc.sessions = doc.sessions.filter((s: any) => s.day < '2026-10-01').slice(0, 9);
     doc.meta.milestonesShown = [];
     await boot(page, { clock: true, seed: doc });
     await runFocus(page);
     await expect(page.getByTestId('message-line')).toHaveText(messages.milestones['sessions-10']!);
-    const confetti = page.locator('.confetti__p');
-    await expect(confetti.first()).toBeAttached();
-    expect(await confetti.count()).toBeGreaterThan(0);
-    expect(await confetti.count()).toBeLessThanOrEqual(36);
-    await page.clock.runFor(1500);
-    await expect(confetti).toHaveCount(0); // gone after about 1.2 s
+    // v2 MIL-2: with stickers on the celebration is the milestone-size sticker burst, not confetti
+    const burst = page.getByTestId('sticker-burst');
+    await expect(burst).toBeAttached();
+    await expect(burst.getByTestId('sticker')).toHaveCount(info.project.name === 'mobile' ? 14 : 18);
+    await expect(page.locator('.confetti__p')).toHaveCount(0);
+    await page.clock.runFor(1700);
+    await expect(burst).toHaveCount(0); // gone within 1.6 s
     await page.clock.fastForward(5 * MIN); // break ends, focus starts
     await expect(page.getByTestId('message-line')).toBeEmpty();
     expect((await stored(page)).meta.milestonesShown).toContain('sessions-10');
@@ -596,14 +599,15 @@ test.describe('accessibility of the timer (A11Y-3, TMR-16)', () => {
 
   test('TMR-16 the focus ring breathes while running; reduced motion turns it off', async ({ page }) => {
     await boot(page, { clock: true });
+    // v2 (design.md 7.1): the breathing glow is a halo around the glass ring bubble
     const anim = () =>
-      page.getByTestId('timer-ring').evaluate((el) => {
+      page.getByTestId('timer-bubble').evaluate((el) => {
         const c = getComputedStyle(el);
         return { name: c.animationName, seconds: parseFloat(c.animationDuration), iterations: c.animationIterationCount };
       });
     expect((await anim()).name).toBe('none');
     await play(page).click();
-    await expect(page.getByTestId('timer-ring')).toHaveClass(/ring--breathing/);
+    await expect(page.getByTestId('timer-bubble')).toHaveClass(/bubble--breathing/);
     const on = await anim();
     expect(on).toMatchObject({ name: 'breathe', iterations: 'infinite' });
     expect(on.seconds).toBeGreaterThan(1);
@@ -612,13 +616,13 @@ test.describe('accessibility of the timer (A11Y-3, TMR-16)', () => {
     expect(off.iterations).toBe('1'); // no looping glow
     expect(off.seconds).toBeLessThan(0.001); // and no visible animation at all
     await play(page).click(); // pause
-    await expect(page.getByTestId('timer-ring')).not.toHaveClass(/ring--breathing/);
+    await expect(page.getByTestId('timer-bubble')).not.toHaveClass(/bubble--breathing/);
   });
 
   test('TMR-16 breathing is for focus only, not breaks', async ({ page }) => {
     await boot(page, { clock: true });
     await page.getByTestId('mode-short').click();
     await play(page).click();
-    await expect(page.getByTestId('timer-ring')).not.toHaveClass(/ring--breathing/);
+    await expect(page.getByTestId('timer-bubble')).not.toHaveClass(/bubble--breathing/);
   });
 });

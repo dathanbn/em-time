@@ -5,9 +5,9 @@ import { boot, go, MIN, sessionsOf } from './helpers';
 /**
  * SYNC against the real Supabase project (D-52). Runs only when all three variables are set:
  *   VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY (the :4174 build is made with them, see playwright.config.ts)
- *   SUPABASE_SERVICE_ROLE_KEY (test environment only; fetches the 6-digit code through the admin API)
+ *   SUPABASE_SERVICE_ROLE_KEY (test environment only; deletes the throwaway accounts the sync code creates)
  * The sandbox proxy returns 403 for supabase.co, so QA reports this spec as "not run".
- * Use a separate test project; it creates and deletes throwaway users.
+ * v3: a sync code signs in or creates the account (Confirm email must be OFF). Use a separate test project; it creates and deletes throwaway users.
  */
 const URL_ = process.env.VITE_SUPABASE_URL;
 const ANON = process.env.VITE_SUPABASE_ANON_KEY;
@@ -21,15 +21,9 @@ test.describe('SYNC real project', () => {
 
   test('SYNC-3, SYNC-7, SYNC-10: two devices converge on the union; anon and other users read nothing', async ({ browser }) => {
     const admin = createClient(URL_!, SERVICE!, { auth: { persistSession: false } });
-    const email = `em-time-e2e+${Date.now()}@example.com`;
-    const created: string[] = [];
+    const code = `qa e2e ${Date.now()}`;
+    const email = `${code.replace(/\s+/g, '-')}@emtime.local`;
     try {
-      const codeFor = async (): Promise<string> => {
-        const { data, error } = await admin.auth.admin.generateLink({ type: 'magiclink', email });
-        if (error) throw error;
-        created.push(data.user.id);
-        return data.properties.email_otp;
-      };
       const device = async (name: string) => {
         const ctx = await browser.newContext({ baseURL: BASE });
         const page = await ctx.newPage();
@@ -42,10 +36,9 @@ test.describe('SYNC real project', () => {
       };
       const signIn = async (page: Page) => {
         await go(page, 'settings');
-        await page.getByTestId('sync-email-input').fill(email);
+        await page.getByTestId('sync-code-input').fill(code);
         await page.getByTestId('sync-send').click();
-        await page.getByTestId('sync-code-input').fill(await codeFor());
-        await page.getByTestId('sync-verify').click();
+        await expect(page.getByText('Linked', { exact: true })).toBeVisible({ timeout: 30_000 });
         await expect(page.getByTestId('sync-status')).toContainText(/Synced/, { timeout: 30_000 });
       };
       const a = await device('A');
@@ -64,7 +57,8 @@ test.describe('SYNC real project', () => {
       await a.ctx.close();
       await b.ctx.close();
     } finally {
-      for (const id of new Set(created)) await admin.auth.admin.deleteUser(id);
+      const { data } = await admin.auth.admin.listUsers({ perPage: 200 });
+      for (const u of data?.users ?? []) if (u.email === email) await admin.auth.admin.deleteUser(u.id);
     }
   });
 });
