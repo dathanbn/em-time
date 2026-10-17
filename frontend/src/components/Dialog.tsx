@@ -1,22 +1,15 @@
 // Modal dialog and bottom sheet: focus trap, Escape to close, focus returned on close.
-import type { ComponentChildren } from 'preact';
-import { useEffect, useId, useRef } from 'preact/hooks';
+import { render, type ComponentChildren } from 'preact';
+import { useEffect, useLayoutEffect, useRef } from 'preact/hooks';
 import { IconButton } from './ui';
+import { nextUid } from './uid';
 
 let openCount = 0;
 
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
-export function Dialog({
-  title,
-  onClose,
-  children,
-  footer,
-  sheet,
-  hideClose,
-  testid,
-}: {
+interface DialogProps {
   title: string;
   onClose: () => void;
   children: ComponentChildren;
@@ -25,9 +18,42 @@ export function Dialog({
   sheet?: boolean;
   hideClose?: boolean;
   testid?: string;
-}) {
+}
+
+/**
+ * Dialogs and sheets are rendered into a host node on document.body, so a `backdrop-filter` card
+ * (which becomes the containing block of `position: fixed`) can never clip or cover them.
+ */
+export function Dialog(props: DialogProps) {
+  const host = useRef<HTMLDivElement | null>(null);
+  if (!host.current) host.current = document.createElement('div');
+  const titleId = useRef('');
+  if (!titleId.current) titleId.current = nextUid('dialog-title');
+  useLayoutEffect(() => {
+    const el = host.current!;
+    document.body.append(el);
+    return () => {
+      render(null, el);
+      el.remove();
+    };
+  }, []);
+  useLayoutEffect(() => {
+    render(<DialogBody {...props} titleId={titleId.current} />, host.current!);
+  });
+  return null;
+}
+
+function DialogBody({
+  title,
+  onClose,
+  children,
+  footer,
+  sheet,
+  hideClose,
+  testid,
+  titleId,
+}: DialogProps & { titleId: string }) {
   const ref = useRef<HTMLDivElement>(null);
-  const titleId = useId();
   useEffect(() => {
     const prev = document.activeElement as HTMLElement | null;
     openCount++;

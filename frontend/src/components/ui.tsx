@@ -1,7 +1,8 @@
 // Small form and button primitives shared by every screen.
 import type { ButtonHTMLAttributes, ComponentChildren, CSSProperties } from 'preact';
-import { useEffect, useId, useRef, useState } from 'preact/hooks';
+import {useEffect, useRef, useState } from 'preact/hooks';
 import { Icon, type IconName } from './Icon';
+import { useUid } from './uid';
 
 type BtnVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'text';
 
@@ -119,6 +120,7 @@ export function Switch({
   hint,
   id,
   disabled,
+  testid,
 }: {
   checked: boolean;
   onChange: (v: boolean) => void;
@@ -126,8 +128,9 @@ export function Switch({
   hint?: ComponentChildren;
   id?: string;
   disabled?: boolean;
+  testid?: string;
 }) {
-  const auto = useId();
+  const auto = useUid();
   const sid = id ?? auto;
   return (
     <div class="row-switch">
@@ -139,6 +142,7 @@ export function Switch({
       </div>
       <button
         id={sid}
+        data-testid={testid}
         type="button"
         role="switch"
         aria-checked={checked}
@@ -175,7 +179,7 @@ export function Stepper({
   testid?: string;
 }) {
   const [text, setText] = useState<string | null>(null);
-  const id = useId();
+  const id = useUid();
   const clamp = (v: number) => Math.min(max, Math.max(min, v));
   const commit = () => {
     if (text === null) return;
@@ -253,7 +257,7 @@ export function Select({
   testid?: string;
   class?: string;
 }) {
-  const auto = useId();
+  const auto = useUid();
   const sid = id ?? auto;
   return (
     <div class={`field${cls ? ` ${cls}` : ''}`}>
@@ -294,7 +298,7 @@ export function Card({
   testid?: string;
   actions?: ComponentChildren;
 }) {
-  const hid = useId();
+  const hid = useUid();
   return (
     <section
       class={`card${cls ? ` ${cls}` : ''}`}

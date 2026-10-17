@@ -1,4 +1,4 @@
-// Inline SVG icons: 24px grid, 1.75px stroke, round caps (Lucide-style shapes drawn in-repo).
+// Inline SVG icons: 24px grid, 2.25px stroke, round caps and joins (Lucide-style shapes drawn in-repo).
 const PATHS = {
   timer: '<circle cx="12" cy="13.5" r="7.5"/><path d="M12 9.5v4l2.5 1.5M9.5 3h5"/>',
   tasks: '<path d="M10 6h10M10 12h10M10 18h10M3.5 6.5 5 8l2.5-3M3.5 12.5 5 14l2.5-3M3.5 18.5 5 20l2.5-3"/>',
@@ -50,7 +50,7 @@ export function Icon({ name, size = 20, class: cls }: { name: IconName; size?: n
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      stroke-width="1.75"
+      stroke-width="2.25"
       stroke-linecap="round"
       stroke-linejoin="round"
       aria-hidden="true"
