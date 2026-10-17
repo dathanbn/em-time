@@ -2,11 +2,14 @@ import { effect } from '@preact/signals';
 import { useEffect, useRef } from 'preact/hooks';
 import { ChartTooltip } from '../charts/Tooltip';
 import { Dialog } from '../components/Dialog';
+import { Mascot } from '../components/Mascot';
+import { Scene } from '../components/Scene';
 import { Icon, type IconName } from '../components/Icon';
 import { Button } from '../components/ui';
 import { setLiveRegion } from '../platform/announce';
-import { applyGradient } from '../platform/gradient';
 import { applyUpdate, needRefresh } from '../platform/pwa';
+import { refreshSky } from '../platform/sky';
+import { startStickers } from '../platform/stickers';
 import { ShortcutsList, Settings } from '../screens/Settings';
 import { Stats } from '../screens/Stats';
 import { Tasks } from '../screens/Tasks';
@@ -15,6 +18,8 @@ import { confirmDiscard, pendingDiscard, shortcutsOpen } from './actions';
 import { Banners } from './Banners';
 import { data, timerState } from './coreBridge';
 import { ROUTES, route, type Route } from './router';
+import { skyPolarity } from './skySignals';
+import { getPicker, rng } from './stickerRuntime';
 
 const NAV: Record<Route, { label: string; icon: IconName }> = {
   timer: { label: 'Timer', icon: 'timer' },
@@ -28,16 +33,7 @@ function Nav() {
   return (
     <nav class={`nav${running ? ' nav--dim' : ''}`} aria-label="Main">
       <a class="nav__brand" href="#/timer" aria-label="Em Time, timer">
-        <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
-          <circle cx="12" cy="12" r="8.5" fill="none" stroke="var(--em-ring-track)" stroke-width="3.2" />
-          <path
-            d="M12 3.5a8.5 8.5 0 1 1-8.2 6.3"
-            fill="none"
-            stroke="var(--em-ring-fill)"
-            stroke-width="3.2"
-            stroke-linecap="round"
-          />
-        </svg>
+        <Mascot state="idle" dark={skyPolarity.value === 'dark'} size={36} class="mascot--still" testid="mascot-glyph" />
         <span>Em Time</span>
       </a>
       <ul class="nav__tabs">
@@ -49,7 +45,7 @@ function Nav() {
               data-testid={`nav-${r}`}
               aria-current={route.value === r ? 'page' : undefined}
             >
-              <Icon name={NAV[r].icon} size={r === route.value ? 20 : 20} />
+              <Icon name={NAV[r].icon} size={20} />
               <span>{NAV[r].label}</span>
             </a>
           </li>
@@ -63,17 +59,30 @@ export function App() {
   const live = useRef<HTMLDivElement>(null);
   useEffect(() => {
     setLiveRegion(live.current);
-    // Theme: data-theme on <html>, theme-color meta, and the matching gradient stops.
-    const stop = effect(() => {
-      const theme = data.value.settings.theme;
-      document.documentElement.dataset.theme = theme;
-      document
-        .querySelector('meta[name="theme-color"]')
-        ?.setAttribute('content', theme === 'dark' ? '#0B1220' : '#F4F9FE');
-      applyGradient(theme);
+    // A theme change re-runs the sky right away (platform/sky.ts also ticks once a minute).
+    let first = true;
+    const stopTheme = effect(() => {
+      void data.value.settings.theme;
+      if (first) first = false;
+      else refreshSky();
+    });
+    // Drifting stickers follow the "Sky stickers" setting.
+    const stopStickers = effect(() => {
+      if (!data.value.settings.stickers) return;
+      const picker = getPicker();
+      const layer = document.querySelector<HTMLElement>('[data-testid="sticker-layer"]');
+      if (!picker || !layer) return;
+      return startStickers({
+        layer,
+        picker,
+        rng,
+        isFocusRunning: () => timerState.value.status === 'running' && timerState.value.phase === 'focus',
+        isNarrow: () => window.matchMedia('(max-width: 899px)').matches,
+      });
     });
     return () => {
-      stop();
+      stopTheme();
+      stopStickers();
       setLiveRegion(null);
     };
   }, []);
@@ -81,6 +90,7 @@ export function App() {
   const r = route.value;
   return (
     <>
+      <Scene />
       <a
         class="skip"
         href="#main"

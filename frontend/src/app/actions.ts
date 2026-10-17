@@ -1,13 +1,16 @@
 // Timer actions with their UI side effects: audio unlock, first-Play notification prompt,
 // announcements, the discard confirm (TMR-12) and the message/break-prompt state.
 import { effect, signal } from '@preact/signals';
-import { DISCARD_CONFIRM_MS, type Phase, type PhaseCompleteEvent } from '@core';
+import { DISCARD_CONFIRM_MS, todayKey, type Phase, type PhaseCompleteEvent } from '@core';
 import { announce } from '../platform/announce';
 import { playChime, unlockAudio } from '../platform/audio';
 import { notificationsSupported } from '../platform/env';
 import { requestPermission, showPhaseNotification } from '../platform/notify';
+import { clearBurst } from '../platform/stickers';
 import { setWakeLock } from '../platform/wakeLock';
 import { core, data, timerState } from './coreBridge';
+import { celebrate, initThumbs, noteGoalProgress, wave } from './mascotState';
+import { celebrateWithStickers } from './stickerRuntime';
 
 export const PHASE_LABEL: Record<Phase, string> = {
   focus: 'Focus',
@@ -30,7 +33,10 @@ function clearCelebration(): void {
 
 function afterStart(): void {
   // MIL-3 and MSG-1: nothing celebratory while a focus phase runs.
-  if (timerState.value.phase === 'focus') clearCelebration();
+  if (timerState.value.phase === 'focus') {
+    clearCelebration();
+    clearBurst();
+  }
 }
 
 function firstPlayEffects(): void {
@@ -112,6 +118,8 @@ export function confirmDiscard(): void {
 
 /** Called once at startup: reacts to phases ending. */
 export function initPhaseEffects(): void {
+  initThumbs();
+  noteGoalProgress(core.select.today().goalMet, todayKey(Date.now()), true);
   core.onPhaseComplete((e: PhaseCompleteEvent) => {
     const settings = core.store.get().settings;
     if (!e.late) {
@@ -121,7 +129,15 @@ export function initPhaseEffects(): void {
     if (e.phase === 'focus') {
       message.value = e.message;
       breakPrompt.value = e.breakPrompt;
-      if (e.milestone) confettiKey.value++;
+      if (e.session) noteGoalProgress(core.select.today().goalMet, todayKey(Date.now()), e.late);
+      if (e.session && !e.late) {
+        celebrate();
+        if (e.milestone && (e.milestone.id === 'streak-7' || e.milestone.id === 'streak-30'))
+          window.setTimeout(wave, 1600);
+      }
+      if (settings.stickers) {
+        if (e.session && !e.late && !document.hidden) celebrateWithStickers(e.milestone !== null);
+      } else if (e.milestone) confettiKey.value++;
       const meta = core.store.get().meta;
       if (e.session && meta.persistRequestedAt === null) {
         core.store.markPersistRequested(Date.now());
@@ -131,7 +147,10 @@ export function initPhaseEffects(): void {
       message.value = null;
       breakPrompt.value = null;
     }
-    if (e.autoStarted && e.nextPhase === 'focus') clearCelebration();
+    if (e.autoStarted && e.nextPhase === 'focus') {
+      clearCelebration();
+      clearBurst();
+    }
     if (!e.late) {
       announce(
         e.phase === 'focus'
