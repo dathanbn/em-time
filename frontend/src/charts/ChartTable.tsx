@@ -57,6 +57,19 @@ export function TableToggle({ on, onToggle }: { on: boolean; onToggle: () => voi
   );
 }
 
-export function Empty({ children, inline }: { children: ComponentChildren; inline?: boolean }) {
-  return <p class={`chart-empty${inline ? ' chart-empty--inline' : ''}`}>{children}</p>;
+export function Empty({
+  children,
+  inline,
+  mascot,
+}: {
+  children: ComponentChildren;
+  inline?: boolean;
+  mascot?: ComponentChildren;
+}) {
+  return (
+    <p class={`chart-empty${inline ? ' chart-empty--inline' : ''}${mascot ? ' chart-empty--mascot' : ''}`}>
+      {mascot}
+      <span>{children}</span>
+    </p>
+  );
 }

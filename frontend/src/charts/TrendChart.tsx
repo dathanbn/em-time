@@ -144,6 +144,13 @@ export function TrendChart({
   };
 
   const showAvgNote = hasAny && avgCount === 0;
+  // The "Goal" label sits at the right end of the goal line: move it under the line, or hide it,
+  // when today's marker comes within ~14px.
+  const nearLabel = (ly: number): boolean =>
+    today !== null &&
+    Math.abs(xOf(todayIdx) - (width - RIGHT - 14)) < 14 + 14 &&
+    Math.abs(yOf(today.valueMin ?? 0) - ly) < 14;
+  const goalLabelY = !nearLabel(goalY - 9) ? goalY - 5 : !nearLabel(goalY + 10) ? goalY + 15 : null;
   const avgNearGoal = lastAvg !== null && Math.abs(yOf(lastAvg) - goalY) < 18;
   const activeAvgY = active !== null && points[active]!.avgMin !== null ? yOf(points[active]!.avgMin!) : null;
   const lastX = lastAvgIdx >= 0 ? xOf(lastAvgIdx) : 0;
@@ -201,9 +208,11 @@ export function TrendChart({
             stroke-opacity="0.4"
             stroke-width="1"
           />
-          <text x={width - RIGHT} y={goalY - 5} text-anchor="end" class="axis-text">
-            Goal
-          </text>
+          {goalLabelY !== null ? (
+            <text x={width - RIGHT} y={goalLabelY} text-anchor="end" class="axis-text">
+              Goal
+            </text>
+          ) : null}
           {runs.map((run, k) => {
             const d = monotonePath(run);
             const a = run[0]!;

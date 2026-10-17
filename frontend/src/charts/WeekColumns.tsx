@@ -1,6 +1,7 @@
 import { useRef, useState } from 'preact/hooks';
 import { MIN, formatDayLabel, formatDuration, isoWeekdayIndex, type WeekSummary } from '@core';
 import { plural } from '../app/selectors';
+import { EmptyMascot } from '../components/EmptyMascot';
 import { ChartTable, Empty } from './ChartTable';
 import { durationTicks, niceMaxMinutes, thinTicks } from './geometry';
 import { anchorOf, hideTip, showTip } from './Tooltip';
@@ -151,7 +152,9 @@ export function WeekColumns({ week, narrow, table }: { week: WeekSummary; narrow
         <div style={{ height: `${H}px` }} />
       )}
       {week.totalMs === 0 && width > 0 ? (
-        <Empty>{week.offset === 0 ? 'No focus time this week yet.' : 'No focus time this week.'}</Empty>
+        <Empty mascot={<EmptyMascot size={narrow ? 52 : 60} />}>
+          {week.offset === 0 ? 'No focus time this week yet.' : 'No focus time this week.'}
+        </Empty>
       ) : null}
     </div>
   );
