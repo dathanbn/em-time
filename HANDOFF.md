@@ -98,3 +98,65 @@ Deviations and additions (all additive or stricter, nothing removed):
 
 ## 2026-10-15 frontend: window.__emCore gated (round 2)
 `window.__emCore` is now exposed only when `import.meta.env.DEV`, or when the build was made with `VITE_E2E=1` AND the URL has `?e2e`. QA: set `VITE_E2E=1` on the build/preview command used by the playwright webServer (the deploy.yml e2e step builds without secrets; it needs `VITE_E2E=1` there too if e2e relies on `?e2e`; deploy.yml already sets it on the e2e build only, never on the Pages build).
+
+## 2026-10-15, logic agent: Core v2 ready (Sky diary settings)
+
+Done inside `frontend/src/core/` only: `ThemeId = 'sky' | 'light' | 'dark'` (default `sky`), `displayName` (synced, default `Em`, 0..24 code points), `mascot` and `stickers` (device-only, default true); `SCHEMA_VERSION = 2` with `MIGRATIONS[1]` (light to sky, dark kept, new keys added, `settings.updatedAt` untouched); `validateSettings`, `store.updateSettings` (`ValidationError('displayName', 'too-long')`, theme `required`, booleans), `toRow`/`fromRow`/`applyRemote` for `displayName`. New tests: `core/settings.v2.test.ts` (30 cases).
+
+Deviations and notes:
+
+- `types.ts` and `constants.ts` follow contract V2 and are therefore no longer byte-identical to contract sections 2 and 7 (they stay in `.prettierignore`).
+- Pulled `displayName` rule (V2.4 says "passes the V2.3 rules"): I read this as strict. After sanitizing (trim, control chars removed) a pulled name is applied only if it is a string of at most 24 code points; a longer string is ignored (local name kept), NOT cut. Local load/import still cuts to 24. The other keys of the same row still apply.
+- `''` is a valid `displayName` locally and from a pulled row.
+- `displayName` is checked for being a string in `updateSettings` (non-string throws `ValidationError('displayName', 'required')`).
+- **Frontend must fix (not mine):** `typecheck` fails in `frontend/src/app/App.tsx:73` and `frontend/src/main.tsx:40` because they pass `ThemeId` to a `'light' | 'dark'` parameter.
+- **QA must update (not mine), 6 unit tests assume v1:** `tests/unit/import.test.ts` (backup-valid expects no `migrated` warning, backup-v0 expects schemaVersion 1), `tests/unit/storage.test.ts` (first-run default theme `light`; backup-bad-records expects status `ok` but a v1 fixture now loads as `migrated`), `tests/unit/store.test.ts` (default theme `light`), `tests/unit/sync.test.ts` SYNC-13 (device-only theme expected `light`, now `sky`). The v1 fixtures can stay as migration cases.
+- My own `core/sync/sync.test.ts` expected push payload now includes `displayName: 'Em'`.
+
+## 2026-10-15, frontend agent: Sky diary (v2) UI built
+
+Built: `platform/sky.ts` (gradient.ts deleted), `platform/stickers.ts`, `app/greeting.ts`, `components/{Scene,Mascot,Companion,EmptyMascot}.tsx`, `styles/scene.css`, restyled tokens/base/components/screens, Settings (You card, 3-way Theme, Cloud friend, Sky stickers), Nunito (Inter removed), new icon + rasters, `check-size.mjs` now also gates CSS at 16 KB. Core lacked nothing.
+
+Notes for QA:
+- Extra CSS vars beyond contract V2.8: `--sky-sun-display`, `--sky-moon-display` (display none outside the arc windows), `--sky-star-vis`, `--sky-ink-shadow`. `sky.ts` also exports `nearestPhase`, `refreshSky`, `currentSky`, `backHillHeight`; `startSky(getMode, onApply?)`.
+- Empty-state mascots and the nav glyph use `data-testid` `mascot-empty` and `mascot-glyph`, so `mascot` is unique per page. Burst stickers carry `data-testid="sticker"` inside `[data-testid="sticker-burst"]`; drifting ones live in `[data-testid="sticker-layer"]`.
+- Timer bubble is `[data-testid="timer-bubble"]`; the desktop nav is not sticky (brand sits on the sky, so it scrolls away).
+- Phone Theme control is a radio list (labels carry `settings-theme-*` testids), segmented at 900+.
+- Stats/Settings: the export reminder now sits below the page title so the title stays in the header band.
+- Timer digits cap at 25% of the bubble width (design table says up to 124px; 124px does not fit the ring).
+
+## Frontend fix round (v2)
+Done: 1 dialogs portal to body (manual render, focus trap + Escape kept), 2 phone moon apex = horizon-56 (skims the strip above the hills, clear of the bubble), "Always dark" pins 02:30 (was 23:00), glow opacity 0.55, 3 focus halo kept on btn--primary/secondary/danger, iconbtn--ghost, selected seg, playbtn, 4 burst starts at the rim and lands rim+10..80px (clamped to viewport), 5 makeup 0.5 in midday/afternoon/dusk/evening (design.md 4.2 table updated), 6 phone nav glass 0.92 (--em-nav-glass), pill/label spacing, 8 Goal label moves under the line or hides near today's marker, 9 Stats empty mascot beside the week-chart caption, 10 phone stars: stroke on dots, sparkles x2.4.
+Skipped: 7 (ease-out blend breaks the QA sky sweeps and 16:47 contrast). 11 done later with coordinator approval: pools deduped (medicine loses 🧠 🧪 ✏️, night keeps 🚑), study gains 🔬 ⚗️ 🧫 📝; design.md 4.2 pools line updated. QA: stickers.test pool expectations need the same change.
+QA tests to update: sky.test "dark pins 23:00" is now 02:30; stickers.test DESIGN_WEIGHTS makeup 0.5 for midday/afternoon/dusk/evening.
+
+## Timer simplification (frontend)
+Phone Timer: no stats at all; greeting + mascot on top, ring/task/dots/controls centred, mode switch (Focus / Short break / Long break) at the bottom above the tab bar (after the controls in DOM order). Desktop: only the streak chip is gone; Today and Up next cards stay.
+Removed test ids: `greeting-sub` (both widths). `today-goal` and `today-ring` now exist only in the desktop side card (the phone strip instance is gone, so they are absent at < 900px). Removed classes: `.todaystrip*`, `.timerpage__strip`, `.chip--sub`. New wrapper `.timerpage__mid` (display: contents on desktop). `mode-*`, `timer-*`, `message-line`, `break-prompt`, `greeting` unchanged. No live-region text referenced stats.
+
+## 2026-10-16, logic agent: v3 sync code sign-in (replaces magic link and OTP)
+
+New API surface for the frontend (all exported from `@core` unless noted):
+
+- `normalizeSyncCode(raw: string): { ok: true; code: string } | { ok: false; error: SyncCodeError }`. Trim, lowercase, whitespace runs to `-`; allowed `a-z 0-9 - _ .`; at least 8 characters.
+- `SyncCodeError = 'code_empty' | 'code_too_short' | 'code_too_long' | 'code_invalid_chars'`. `code_too_long` (over 64 characters, the email local-part limit) and `code_invalid_chars` are additions; the coordinator spec only named `code_too_short` and empty.
+- `deriveSyncCredentials(raw): Promise<{ ok: true; credentials: { email; password } } | { ok: false; error: SyncCodeError }>`. Email `${slug}@emtime.local` (`.` becomes `-`), password hex SHA-256 of `em-time:v1:` + code. Web Crypto first, pure-JS fallback.
+- `SYNC_CODE_MIN = 8`, `SYNC_CODE_MAX = 64`.
+- `SyncEngine.signInWithCode(code: string): Promise<SignInWithCodeResult>` where `SignInWithCodeResult = { ok: true } | { ok: false; error: SignInWithCodeError; message?: string }` and `SignInWithCodeError = SyncCodeError | 'confirm_email_on' | 'rate_limited' | 'network' | 'unknown'`. `confirm_email_on` carries `message` (also exported as `CONFIRM_EMAIL_ON_MESSAGE` from `core/sync/engine`). Validation errors return before any request.
+- Removed: `SyncEngine.requestCode`, `SyncEngine.verifyCode`, `?code=` / PKCE return handling (client now `detectSessionInUrl: false`, no `flowType`), and the `-code-verifier` branch of `hasStoredAuth()` (now only: a stored session exists). `SupabaseLike.auth` lost `signInWithOtp`/`verifyOtp` and gained `signInWithPassword` and `signUp`.
+- Unchanged: first-sign-in merge (mark all dirty, reset cursors, push, pull), `signOut()` at local scope, every other sync behavior.
+
+Notes and deviations:
+
+- `meta.sync.email` is now always `null` for code accounts (the address contains the code, so it must not be written to AppData or backups). `SyncState.email` is therefore `null`; UI should show "Signed in with a sync code", not an address. `SyncStatus` `'code-sent'` is still in the type but the engine never emits it; the UI step flow is now: one code field, one button.
+- An existing account whose Confirm email setting is on also yields `confirm_email_on` (Supabase says "Email not confirmed").
+- `fakeSupabase.ts`: `validCode` removed; `FakeServer` gained `passwords`, `confirmEmail`, `confirmed`. Op kinds `signInWithPassword` / `signUp`.
+- Needs other agents: frontend, `screens/SyncCard.tsx` still calls `requestCode`/`verifyCode` (typecheck fails there only). QA, `tests/unit/syncHarness.ts` still mocks `signInWithOtp`/`verifyOtp` and calls `requestCode`/`verifyCode`; 24 QA unit tests in `tests/unit/sync.test.ts` and `migration.v2.test.ts` fail until the harness uses `signInWithCode` (a mock needs `signInWithPassword` and `signUp`).
+- Supabase dashboard: Authentication, Sign In / Providers, Email: Enable Sign in / up ON, Confirm email OFF (see `frontend/supabase/README.md`). Not verified against the live project (proxy blocks it).
+- Tests: `core/sync/syncCode.test.ts` (normalization, deterministic and case-insensitive derivation, SHA fallback equals Web Crypto, sign-in, sign-up, `confirm_email_on`, too-short, same code on two devices, signOut scope); `sync.test.ts` and `env.test.ts` updated.
+
+## 2026-10-16 frontend: Doodle Cloud, phone Timer layout, sync code card
+- Mascot: `components/Mascot.tsx` is now Doodle Cloud (viewBox 160x140, width = old size, so height is 0.875 x width; was 0.75). States: idle (little wave), focusing (book), break (coffee), celebrate (arms up + confetti), wave (hugging a heart), plus new `shrug` (empty states, "???", `mascot-empty` uses it) and `thumbs` (goal met; implemented, not wired to the state machine). Night: `data-accessory="headlamp"`, `.m-eyes--wide`, star companion on break/celebrate. Same test ids, `data-state` and `data-accessory` names, `.m-eyes--*`/`.m-lamp` classes, no `<text>`. Outline tokens: `--mascot-line` near-black by day, ice blue (#9fd8ff) in dark. Icons regenerated (`npm run icons`); `icon.svg` and `favicon.svg` are the idle doodle on the sky.
+- Phone Timer: greeting row (extra 6px top padding), frosted mode pill (`.modes`, 340px max, options 44px) under it, ring/task/dots/controls, message and break card hang in a reserved band above the tab bar. Desktop keeps its structure and gets the same pill style.
+- SyncCard: one "Sync code" field + "Link this device" (`sync-code-input`, `sync-send`); signed in shows "Linked", status line, Sync now, Sign out (`sync-status`, `sync-now`, `sync-signout`). Removed test ids: `sync-email-input`, `sync-verify`. Validation runs locally with `normalizeSyncCode`; `confirm_email_on` shows the Supabase hint. QA: `tests/unit/syncHarness.ts` still fails typecheck (`signInWithOtp`, `requestCode`, `verifyCode`), so `npm run build` (which runs `tsc`) fails until it is updated; `vite build` alone passes (JS 58.7 KB / 60).
+- Follow-up: `thumbs` is wired (`app/mascotState.ts`: `noteGoalProgress` after each focus session, `thumbing` for 3 s, queued while a focus session runs or celebrate plays; only the Timer mascot, never the idle-only page mascots). Phone break idea is clamped to one line (ellipsis, full text in `title`); reserved band padding is 140px.

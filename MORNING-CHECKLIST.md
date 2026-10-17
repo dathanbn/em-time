@@ -1,5 +1,9 @@
 # Em Time: morning deploy checklist
 
+> **v2 note (Sky diary redesign landed on top of v1).** Two files could not be removed from your folder remotely, so before `git add .` run, in the Em Time folder:
+> `Remove-Item tests\screenshots\*.png` (stale v1 screenshots; the current ones are in `tests\screenshots\v1\` and `v2\`) and `Remove-Item frontend\src\platform\gradient.ts` (replaced by `sky.ts`; the file left behind is an empty stub, harmless if you forget).
+> Supabase: nothing new. Her name now syncs; theme, cloud friend and stickers are per device.
+
 Everything below is one-time. Budget about 25 minutes. Do the parts in order.
 Values you will paste are in `.env.example` at the root of this folder (they are public keys, safe to publish).
 
@@ -47,7 +51,7 @@ If git asks who you are first:
 
 ```powershell
 git config --global user.name "Dathan"
-git config --global user.email "your-github-email"
+git config --global user.email "dathanbn@gmail.com"
 ```
 
 **A4. Watch the build**
@@ -60,36 +64,15 @@ If the run fails, open the failed step and paste the last 30 lines to me. The mo
 
 ---
 
-## Part B: Supabase dashboard (about 8 minutes)
+## Part B: Supabase dashboard (about 1 minute)
 
-The project and database schema already exist (I created them through the connector). These are the auth settings only. Open https://supabase.com/dashboard, project **em-time**.
+The project and database already exist. Sign-in is now a **sync code** she picks herself (8+ characters), no emails at all, so only one switch matters. Open https://supabase.com/dashboard, project **em-time**, left sidebar **Authentication** (shield icon), then under Configuration:
 
-**B1. Authentication, Sign In / Providers (or "Providers"), Email**
+**Sign In / Providers → Email** (click to expand): "Enable Sign in / up" ON, **"Confirm email" OFF**. Save.
 
-- Enable Email provider: on
-- Confirm email: on
-- Leave everything else at defaults. The app never uses passwords; it sends a magic link and a 6-digit code.
+Nothing else: no URL configuration, no email templates, no SMTP, no team invite. If "Confirm email" is left on, the app shows a message saying exactly that when she tries to link a device.
 
-**B2. Authentication, URL Configuration**
-
-- Site URL: `https://dathanbn.github.io/em-time/`
-- Redirect URLs, add both:
-  - `https://dathanbn.github.io/em-time/**`
-  - `http://localhost:5173/em-time/**`
-
-**B3. Authentication, Emails (Email Templates), Magic Link**
-
-Add one line to the template body so the email also carries the code (needed when the app is installed on the iPhone home screen, where the link cannot hand the session back):
-
-```html
-<p>Or type this code in Em Time: {{ .Token }}</p>
-```
-
-Keep the existing `{{ .ConfirmationURL }}` link.
-
-**B4. Know the limit**
-
-Supabase's built-in email sender allows only a few auth emails per hour. Fine for one person, but while testing do not request five links in a row. If you ever want unlimited, Authentication, SMTP settings lets you plug in a free Resend or Brevo account (not needed now).
+How it works: the code is turned into a hidden email-and-password pair on the device, so Supabase sees a normal account. The code is the only secret; anyone who knows it can see that history, so she should keep it to herself. If she forgets it, she picks a new one and her on-device history is pushed to the new account.
 
 ---
 
@@ -97,16 +80,16 @@ Supabase's built-in email sender allows only a few auth emails per hour. Fine fo
 
 Laptop, Chrome:
 1. Open https://dathanbn.github.io/em-time/ and press Space. The ring should start. Notification permission is asked here, on first Start, not on load.
-2. Settings, Sync, enter an email, "Send link". Open the email, click the link. The Sync card should say signed in and "Synced just now".
+2. Settings, Sync, type a sync code (8+ characters, e.g. a phrase only she knows), "Link this device". The card should say "Linked".
 3. Chrome address bar, install icon (or menu, "Install Em Time"). Installed app opens standalone.
 
 iPhone, Safari:
 1. Open the same URL, Share, "Add to Home Screen".
-2. Open it from the home screen. Settings, Sync, enter the same email, then type the 6-digit code from the email (the link will not work inside the home-screen app; the code does).
+2. Open it from the home screen. Settings, Sync, type the same sync code, "Link this device".
 3. Complete one 1-minute session (Settings lets you set Focus to 1 min). Switch to the laptop and reload: the session should appear in Today and in the heatmap.
 4. Lock the phone mid-session and unlock after a minute: remaining time should be correct. Note: iPhone cannot ring or notify while locked; "Keep screen awake" in Settings is the workaround.
 
-Her setup, when you hand it over: she signs in with her own email on each device once, everything else is automatic. The export reminder exists because Safari can wipe site data after 7 days of non-use unless the app is on the home screen, so have her install it.
+Her setup, when you hand it over: she picks a sync code and types it once on each device, everything else is automatic. The export reminder exists because Safari can wipe site data after 7 days of non-use unless the app is on the home screen, so have her install it.
 
 ---
 

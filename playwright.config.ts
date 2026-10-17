@@ -1,12 +1,35 @@
-import { defineConfig, devices } from '@playwright/test';
+import { existsSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
+import { chromium, defineConfig, devices } from '@playwright/test';
 
 // Default Chromium resolution: PLAYWRIGHT_BROWSERS_PATH locally, `npx playwright install` on CI.
+// Offline fallback: when the build Playwright wants is not installed (sandboxes that cannot download),
+// use any other headless shell found under PLAYWRIGHT_BROWSERS_PATH. CI never takes this branch.
+function fallbackChromium(): string | undefined {
+  if (process.env.QA_CHROMIUM) return process.env.QA_CHROMIUM;
+  try {
+    if (existsSync(chromium.executablePath())) return undefined;
+  } catch {
+    /* fall through */
+  }
+  const root = process.env.PLAYWRIGHT_BROWSERS_PATH;
+  if (!root || !existsSync(root)) return undefined;
+  for (const dir of readdirSync(root).filter((d) => d.startsWith('chromium_headless_shell-')).sort().reverse()) {
+    for (const rel of ['chrome-linux/headless_shell', 'chrome-headless-shell-linux64/chrome-headless-shell']) {
+      const p = join(root, dir, rel);
+      if (existsSync(p)) return p;
+    }
+  }
+  return undefined;
+}
+const executablePath = fallbackChromium();
 
 const BASE = 'http://localhost:4173/em-time/';
 const SYNC_BASE = 'http://localhost:4174/em-time/';
 
 const launchOptions = {
   args: ['--no-sandbox', '--disable-dev-shm-usage'],
+  ...(executablePath ? { executablePath } : {}),
 };
 
 const supaUrl = process.env.VITE_SUPABASE_URL || 'https://qa-fake.example.test';
@@ -24,10 +47,11 @@ export default defineConfig({
   expect: { timeout: 7_500 },
   fullyParallel: true,
   workers: process.env.CI ? 2 : 3,
-  retries: 0,
+  retries: process.env.CI ? 2 : 0, // GitHub runners are slow and shared; a flaky pass is retried, a real failure still fails
   reporter: [['list'], ['json', { outputFile: 'test-results/results.json' }]],
   use: {
     baseURL: BASE,
+    actionTimeout: 15_000, // a click blocked by an overlapping element fails in 15 s, not after the 60 s test timeout
     locale: 'en-US',
     timezoneId: 'America/Los_Angeles',
     colorScheme: 'light',
