@@ -1,0 +1,168 @@
+/* Design tokens: names fixed by docs/contract.md section 8, values from docs/design.md. */
+:root {
+  color-scheme: light;
+
+  /* surfaces */
+  --em-bg: #f4f9fe;
+  --em-bg-grad-top: #f4f9fe;
+  --em-bg-grad-bottom: #ffffff;
+  --em-surface: #ffffff;
+  --em-surface-sunk: #eef3f8;
+  --em-border: rgba(19, 32, 47, 0.08);
+  --em-scrim: rgba(19, 32, 47, 0.32);
+
+  /* ink */
+  --em-ink: #13202f;
+  --em-ink-2: #475569;
+  --em-ink-3: #5b6b82;
+
+  /* accent */
+  --em-accent: #8cc4f0;
+  --em-accent-soft: #dceefc;
+  --em-accent-text: #1f6fb2;
+  --em-on-accent: #0f2236;
+  --em-focus-ring: #1f6fb2;
+
+  /* timer ring */
+  --em-ring-track: #e4eef8;
+  --em-ring-fill: #7db8ec;
+  --em-ring-glow: rgba(125, 184, 236, 0.35);
+
+  /* feedback */
+  --em-danger: #b42318;
+  --em-danger-soft: #fdecea;
+
+  /* nav while a focus phase runs: muted ink instead of opacity */
+  --em-nav-muted: #5b6b82;
+
+  /* chart chrome */
+  --em-grid: #e6edf5;
+  --em-axis: #c9d5e3;
+
+  /* heatmap (sequential) */
+  --em-heat-0: #edf2f7;
+  --em-heat-1: #86b6ef;
+  --em-heat-2: #5598e7;
+  --em-heat-3: #2a78d6;
+  --em-heat-4: #1c5cab;
+
+  /* categories (identity) */
+  --em-cat-1: #2a78d6;
+  --em-cat-2: #eb6834;
+  --em-cat-3: #1baf7a;
+  --em-cat-4: #eda100;
+  --em-cat-5: #e87ba4;
+  --em-cat-6: #008300;
+  --em-cat-7: #6250d6;
+  --em-cat-8: #e34948;
+
+  /* type */
+  --em-font-sans: 'Inter Variable', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --em-fs-xs: 0.75rem;
+  --em-fs-sm: 0.875rem;
+  --em-fs-md: 1rem;
+  --em-fs-lg: 1.25rem;
+  --em-fs-xl: 1.5rem;
+  --em-fs-stat: 2rem;
+  --em-fs-timer: clamp(64px, 16vw, 112px);
+  --em-fw-light: 300;
+  --em-fw-regular: 400;
+  --em-fw-medium: 500;
+  --em-fw-semibold: 600;
+
+  /* space (4px base) */
+  --em-space-1: 4px;
+  --em-space-2: 8px;
+  --em-space-3: 12px;
+  --em-space-4: 16px;
+  --em-space-5: 24px;
+  --em-space-6: 32px;
+  --em-space-7: 48px;
+  --em-space-8: 64px;
+  --em-space-9: 96px;
+
+  /* radii */
+  --em-radius-sm: 8px;
+  --em-radius-md: 12px;
+  --em-radius-lg: 20px;
+  --em-radius-pill: 999px;
+
+  /* shadows */
+  --em-shadow-sm: 0 1px 2px rgba(19, 32, 47, 0.04), 0 1px 1px rgba(19, 32, 47, 0.03);
+  --em-shadow-md: 0 4px 16px rgba(31, 111, 178, 0.06), 0 1px 3px rgba(19, 32, 47, 0.05);
+  --em-shadow-lg: 0 12px 40px rgba(31, 111, 178, 0.08), 0 2px 6px rgba(19, 32, 47, 0.05);
+
+  /* motion */
+  --em-dur-fast: 120ms;
+  --em-dur-base: 200ms;
+  --em-dur-slow: 320ms;
+  --em-dur-refill: 600ms;
+  --em-dur-breath: 4000ms;
+  --em-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --em-ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --em-ease-breath: cubic-bezier(0.45, 0, 0.55, 1);
+
+  /* layout */
+  --em-nav-h: 64px;
+  --em-content-max: 1120px;
+  --em-gutter: 16px;
+}
+
+@media (min-width: 900px) {
+  :root {
+    --em-gutter: 32px;
+  }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --em-bg: #0b1220;
+  --em-bg-grad-top: #0f1a2c;
+  --em-bg-grad-bottom: #0b1220;
+  --em-surface: #121b2b;
+  --em-surface-sunk: #0e1625;
+  --em-border: rgba(156, 211, 245, 0.1);
+  --em-scrim: rgba(0, 0, 0, 0.55);
+
+  --em-ink: #e6eef7;
+  --em-ink-2: #a9b8cc;
+  --em-ink-3: #8394ab;
+
+  --em-accent: #9cd3f5;
+  --em-accent-soft: #1d3550;
+  --em-accent-text: #9cd3f5;
+  --em-on-accent: #0b1220;
+  --em-focus-ring: #9cd3f5;
+
+  --em-ring-track: #1c2a40;
+  --em-ring-fill: #9cd3f5;
+  --em-ring-glow: rgba(156, 211, 245, 0.3);
+
+  --em-danger: #f4a6a0;
+  --em-danger-soft: #3a1e24;
+
+  --em-nav-muted: #8394ab;
+
+  --em-grid: #1e2a3d;
+  --em-axis: #2e3d55;
+
+  --em-heat-0: #1c2840;
+  --em-heat-1: #2b5c8f;
+  --em-heat-2: #3f7fc2;
+  --em-heat-3: #6aaeea;
+  --em-heat-4: #a8daf8;
+
+  --em-cat-1: #3987e5;
+  --em-cat-2: #d95926;
+  --em-cat-3: #199e70;
+  --em-cat-4: #c98500;
+  --em-cat-5: #d55181;
+  --em-cat-6: #008300;
+  --em-cat-7: #9085e9;
+  --em-cat-8: #e66767;
+
+  --em-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --em-shadow-md: 0 6px 20px rgba(0, 0, 0, 0.35);
+  --em-shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.45);
+}

@@ -1,0 +1,11 @@
+dist
+node_modules
+coverage
+test-results
+package-lock.json
+frontend/supabase/migrations
+frontend/src/core/fixtures/stub-data.json
+frontend/src/core/types.ts
+frontend/src/core/constants.ts
+docs
+*.md

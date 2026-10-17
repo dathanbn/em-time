@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Em Time</title>
+    <meta name="theme-color" content="#F4F9FE" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Em Time" />
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="apple-touch-icon-180x180.png" />
+    <script>
+      // Apply the saved theme before first paint so dark mode never flashes light.
+      try {
+        var d = JSON.parse(localStorage.getItem('em-time:data') || 'null');
+        if (d && d.settings && d.settings.theme === 'dark') {
+          document.documentElement.setAttribute('data-theme', 'dark');
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#0B1220');
+        }
+      } catch (e) {}
+    </script>
+    <style>
+      html,
+      body {
+        margin: 0;
+        background-color: #f4f9fe;
+        color: #13202f;
+        font-family:
+          system-ui,
+          -apple-system,
+          'Segoe UI',
+          sans-serif;
+      }
+      html[data-theme='dark'],
+      html[data-theme='dark'] body {
+        background-color: #0b1220;
+      }
+      #boot {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        pointer-events: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="boot" aria-hidden="true">
+      <svg width="64" height="64" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="8.5" fill="none" stroke="#dceefc" stroke-width="2.4" />
+        <path
+          d="M12 3.5a8.5 8.5 0 1 1-8.2 6.3"
+          fill="none"
+          stroke="#7db8ec"
+          stroke-width="2.4"
+          stroke-linecap="round"
+        />
+      </svg>
+    </div>
+    <div id="app"></div>
+    <noscript>Em Time needs JavaScript to run.</noscript>
+    <script type="module" src="./src/main.tsx"></script>
+  </body>
+</html>
