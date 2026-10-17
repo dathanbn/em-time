@@ -6,6 +6,7 @@ import { gzipSync } from 'node:zlib';
 import { join } from 'node:path';
 
 const BUDGET = 60 * 1024;
+const CSS_BUDGET = 16 * 1024; // raised from 12 KB for the sky scene, mascot and glass styles (design.md 11)
 const dist = new URL('../dist/', import.meta.url).pathname;
 const html = readFileSync(join(dist, 'index.html'), 'utf8');
 const gz = (file) => gzipSync(readFileSync(join(dist, file))).length;
@@ -25,9 +26,13 @@ const assets = readdirSync(join(dist, 'assets'));
 const css = assets.filter((f) => f.endsWith('.css')).reduce((n, f) => n + gz(`assets/${f}`), 0);
 const lazy = assets.filter((f) => f.endsWith('.js') && !scripts.includes(`assets/${f}`));
 
-console.log(`initial JS: ${kb(initial)} gzipped (budget ${kb(BUDGET)})  CSS: ${kb(css)}`);
+console.log(`initial JS: ${kb(initial)} gzipped (budget ${kb(BUDGET)})  CSS: ${kb(css)} (budget ${kb(CSS_BUDGET)})`);
 for (const f of lazy) console.log(`  lazy chunk ${f}: ${kb(gz(`assets/${f}`))} gzipped`);
 if (initial > BUDGET) {
   console.error('check-size: initial JS is over budget');
+  process.exit(1);
+}
+if (css > CSS_BUDGET) {
+  console.error('check-size: CSS is over budget');
   process.exit(1);
 }
