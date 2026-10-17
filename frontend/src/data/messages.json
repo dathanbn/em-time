@@ -63,5 +63,44 @@
     "streak-7": "Seven days in a row. A full week of showing up.",
     "streak-30": "Thirty days straight. That's a real rhythm."
   },
-  "aboutLine": "Made with care, for you."
+  "aboutLine": "Made with care, for you.",
+  "sky": {
+    "greetings": {
+      "dawn": [
+        "Good morning, {name}",
+        "Sunrise session, {name}",
+        "Early bird, {name}"
+      ],
+      "morning": [
+        "Good morning, {name}",
+        "Morning, {name}",
+        "Hello sunshine, {name}"
+      ],
+      "afternoon": [
+        "Good afternoon, {name}",
+        "Afternoon, {name}",
+        "Hi there, {name}"
+      ],
+      "evening": [
+        "Good evening, {name}",
+        "Evening, {name}",
+        "Golden hour, {name}"
+      ],
+      "night": [
+        "Night owl session, {name}",
+        "Night shift focus, {name}",
+        "Starry night session, {name}"
+      ]
+    },
+    "subline": {
+      "streakStar": "{n}-day streak, look at you",
+      "todayAndStreak": "{k} sessions today · {n}-day streak",
+      "todayAndStreakOne": "{k} session today · {n}-day streak",
+      "today": "{k} sessions today",
+      "todayOne": "{k} session today",
+      "keepStreak": "Keep your {n}-day streak going",
+      "keepStreakOne": "Keep your streak going",
+      "ready": "Ready when you are"
+    }
+  }
 }

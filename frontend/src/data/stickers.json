@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "pools": {
+    "medicine": ["🚑", "🩺", "🧬", "🩹", "🏥", "💊", "📚", "🦴", "❤️‍🩹"],
+    "girly":    ["🎀", "🌸", "💖", "✨", "💫", "🫧", "🦋", "🍓", "🧸", "🌈"],
+    "makeup":   ["💄", "💅"],
+    "night":    ["🌙", "⭐", "🦉", "🚑", "🔦"],
+    "dawn":     ["☕", "🌅", "🐦"],
+    "study":    ["📖", "🧠", "🧪", "✏️", "🔬", "⚗️", "🧫", "📝"]
+  },
+  "weights": {
+    "latenight": { "medicine": 4, "girly": 2, "makeup": 0.5, "night": 5, "dawn": 0, "study": 2 },
+    "dawn":      { "medicine": 2, "girly": 3, "makeup": 0.5, "night": 1, "dawn": 5, "study": 2 },
+    "morning":   { "medicine": 3, "girly": 3, "makeup": 0.5, "night": 0, "dawn": 2, "study": 4 },
+    "midday":    { "medicine": 3, "girly": 4, "makeup": 0.5, "night": 0, "dawn": 0, "study": 4 },
+    "afternoon": { "medicine": 3, "girly": 4, "makeup": 0.5, "night": 0, "dawn": 0, "study": 3 },
+    "dusk":      { "medicine": 3, "girly": 4, "makeup": 0.5, "night": 2, "dawn": 0, "study": 2 },
+    "evening":   { "medicine": 3, "girly": 3, "makeup": 0.5, "night": 3, "dawn": 0, "study": 2 },
+    "night":     { "medicine": 4, "girly": 2, "makeup": 0.5, "night": 5, "dawn": 0, "study": 2 }
+  }
+}
