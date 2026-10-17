@@ -1,6 +1,6 @@
-// Copied verbatim from docs/contract.md section 7. Do not edit without a HANDOFF.md note.
+// docs/contract.md section 7 as amended by "v2 changes" V2.2. Do not edit without a HANDOFF.md note.
 export const APP_ID = 'em-time';
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;                       // v2 (was 1)
 export const STORAGE_KEY = 'em-time:data';
 export const CORRUPT_KEY_PREFIX = 'em-time:corrupt:';
 export const AUTH_STORAGE_KEY = 'em-time:auth';
@@ -18,9 +18,14 @@ export const LIMITS = {
   focusMin: [1, 180], shortMin: [1, 60], longMin: [1, 90], longEvery: [2, 8],
   dailyGoalMin: [15, 720], volume: [0, 1],
   taskName: [1, 80], categoryName: [1, 30], categories: [1, 8],
+  displayName: [0, 24],
 } as const;
 export const DAILY_GOAL_STEP_MIN = 15;
 export const DEFAULT_DAILY_GOAL_MIN = 120;
+export const DEFAULT_THEME = 'sky';                    // v2
+export const DEFAULT_DISPLAY_NAME = 'Em';              // v2
+export const DEFAULT_MASCOT = true;                    // v2
+export const DEFAULT_STICKERS = true;                  // v2
 export const DAY_START_HOUR = 6;           // study day = local start time minus 6 hours
 export const DEFAULT_WEEK_STARTS_ON = 1;
 export const DEFAULT_VOLUME = 0.6;
@@ -56,6 +61,7 @@ export const SYNC_TABLES = ['categories', 'tasks', 'sessions', 'settings'] as co
 export const SYNCED_SETTINGS_KEYS = [
   'preset', 'focusMin', 'shortMin', 'longMin', 'longEvery', 'autoStart',
   'dailyGoalMin', 'weekStartsOn', 'breakPrompts', 'encouragement',
+  'displayName',
 ] as const;
 export const SYNC_DEBOUNCE_MS = 2_000;
 export const SYNC_MAX_WAIT_MS = 10_000;

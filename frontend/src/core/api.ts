@@ -231,15 +231,14 @@ export type SupabaseFactory = (url: string, key: string, options: object) => Sup
 
 export interface SupabaseLike {
   auth: {
-    signInWithOtp(a: {
+    signInWithPassword(a: {
       email: string;
-      options: { emailRedirectTo: string; shouldCreateUser: true };
-    }): Promise<{ error: AuthErrorLike | null }>;
-    verifyOtp(a: {
-      email: string;
-      token: string;
-      type: 'email';
+      password: string;
     }): Promise<{ data: { session: SessionLike | null }; error: AuthErrorLike | null }>;
+    signUp(a: { email: string; password: string }): Promise<{
+      data: { session: SessionLike | null; user: { id: string } | null };
+      error: AuthErrorLike | null;
+    }>;
     getSession(): Promise<{ data: { session: SessionLike | null } }>;
     onAuthStateChange(cb: (event: string, session: SessionLike | null) => void): {
       data: { subscription: { unsubscribe(): void } };

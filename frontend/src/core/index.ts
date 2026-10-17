@@ -41,6 +41,9 @@ export {
 export { isSyncConfigured, readSyncEnv, hasStoredAuth } from './sync/env';
 export type { SyncEngine } from './sync/engine'; // implementation lazy-loaded: import('./sync/engine')
 export { toRow, fromRow } from './sync/rows';
+export { normalizeSyncCode, deriveSyncCredentials, SYNC_CODE_MIN, SYNC_CODE_MAX } from './sync/syncCode';
+export type { SyncCodeError, NormalizedSyncCode, SyncCredentials } from './sync/syncCode';
+export type { SignInWithCodeResult, SignInWithCodeError } from './sync/engine';
 
 // Additions beyond contract.md section 1 (see HANDOFF.md)
 export { ValidationError } from './store/errors';

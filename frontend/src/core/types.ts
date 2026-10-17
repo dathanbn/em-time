@@ -1,11 +1,12 @@
-// Copied verbatim from docs/contract.md section 2. Do not edit without a HANDOFF.md note.
+// docs/contract.md section 2 as amended by "v2 changes" V2.1 (ThemeId, displayName, mascot, stickers).
+// Do not edit without a HANDOFF.md note.
 export type ISODay = string;                 // 'YYYY-MM-DD'
 export type Phase = 'focus' | 'short' | 'long';
 export type TimerStatus = 'idle' | 'running' | 'paused';
 export type CategoryColorSlot = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 export type PresetId = '25/5' | '50/10' | '90/20' | 'custom';
 export type ChimeId = 'glass' | 'bowl' | 'bell' | 'wood' | 'none';
-export type ThemeId = 'light' | 'dark';
+export type ThemeId = 'sky' | 'light' | 'dark';   // v2: 'sky' added and is the default
 export type TrendRange = 30 | 90 | 365;
 export type HeatLevel = 0 | 1 | 2 | 3 | 4;
 export type StorageStatus = 'ok' | 'quota' | 'unavailable' | 'read-only-newer';
@@ -57,13 +58,16 @@ export interface Settings {
   weekStartsOn: 0 | 1;        // 0 Sunday, 1 Monday
   breakPrompts: boolean;
   encouragement: boolean;
+  displayName: string;        // v2, synced. Trimmed, 0..24 chars, '' = no name. Default 'Em'.
   updatedAt: number;          // last change to a SYNCED key only; 0 when untouched defaults
   // device-only keys
-  theme: ThemeId;
+  theme: ThemeId;             // default 'sky'
   chime: ChimeId;
   volume: number;             // 0..1
   notifications: boolean;     // user intent; actual permission read at runtime
   keepAwake: boolean;
+  mascot: boolean;            // v2, device-only. Default true.
+  stickers: boolean;          // v2, device-only. Default true.
 }
 
 export interface TimerState {

@@ -1,4 +1,4 @@
-import { MIN, STORAGE_KEY } from './constants';
+import { MIN, SCHEMA_VERSION, STORAGE_KEY } from './constants';
 import { createEmCore } from './core';
 import fixture from './fixtures/stub-data.json';
 import { createMemoryAdapter } from './storage/persist';
@@ -107,7 +107,16 @@ export function buildStubData(now: number): AppData {
   meta.lastCategoryId = categories[0]!.id;
   meta.lastExportAt = now - 2 * 24 * 60 * MIN; // keeps the export reminder quiet by default
 
-  return { app: 'em-time', schemaVersion: 1, settings, categories, tasks, sessions, timer, meta };
+  return {
+    app: 'em-time',
+    schemaVersion: SCHEMA_VERSION,
+    settings,
+    categories,
+    tasks,
+    sessions,
+    timer,
+    meta,
+  };
 }
 
 /**
