@@ -20,6 +20,7 @@ import type {
   Settings,
   SyncMeta,
   Task,
+  ThemeId,
   TimerState,
 } from '../types';
 import type { TimerConfig } from '../api';
@@ -105,6 +106,32 @@ export function validateSession(x: unknown): Session | null {
   };
 }
 
+// eslint-disable-next-line no-control-regex
+const CONTROL_CHARS = /[\u0000-\u001F\u007F]/g;
+const DISPLAY_NAME_MAX = LIMITS.displayName[1];
+
+/** Strips control characters (U+0000 to U+001F, U+007F) and trims. Length is not limited here. */
+export function sanitizeDisplayName(raw: string): string {
+  return raw.replace(CONTROL_CHARS, '').trim();
+}
+
+/** Local load/import rule (V2.3): sanitize, then cut to 24 code points. Non-string gives null. */
+export function normalizeDisplayName(x: unknown): string | null {
+  if (typeof x !== 'string') return null;
+  const s = sanitizeDisplayName(x);
+  const points = Array.from(s);
+  return points.length > DISPLAY_NAME_MAX ? points.slice(0, DISPLAY_NAME_MAX).join('').trim() : s;
+}
+
+/** Pulled value rule (V2.4): a string that is within 24 code points after sanitizing, else null (ignored). */
+export function parseRemoteDisplayName(x: unknown): string | null {
+  if (typeof x !== 'string') return null;
+  const s = sanitizeDisplayName(x);
+  return Array.from(s).length <= DISPLAY_NAME_MAX ? s : null;
+}
+
+const THEMES: ThemeId[] = ['sky', 'light', 'dark'];
+
 const clamp = (n: number, [lo, hi]: readonly [number, number]): number => Math.min(hi, Math.max(lo, n));
 const PRESET_IDS: PresetId[] = ['25/5', '50/10', '90/20', 'custom'];
 const CHIMES: ChimeId[] = ['glass', 'bowl', 'bell', 'wood', 'none'];
@@ -135,11 +162,14 @@ export function validateSettings(x: unknown): Settings {
     breakPrompts: bool(x.breakPrompts, d.breakPrompts),
     encouragement: bool(x.encouragement, d.encouragement),
     updatedAt: isMs(x.updatedAt) ? Math.floor(x.updatedAt) : 0,
-    theme: x.theme === 'dark' ? 'dark' : 'light',
+    theme: THEMES.includes(x.theme as ThemeId) ? (x.theme as ThemeId) : d.theme,
     chime: CHIMES.includes(x.chime as ChimeId) ? (x.chime as ChimeId) : d.chime,
     volume: isNum(x.volume) ? clamp(x.volume, LIMITS.volume) : d.volume,
     notifications: bool(x.notifications, d.notifications),
     keepAwake: bool(x.keepAwake, d.keepAwake),
+    displayName: normalizeDisplayName(x.displayName) ?? d.displayName,
+    mascot: bool(x.mascot, d.mascot),
+    stickers: bool(x.stickers, d.stickers),
   };
 }
 
