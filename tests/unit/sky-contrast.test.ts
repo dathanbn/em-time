@@ -11,9 +11,13 @@ import {
   hexRgb,
   hhmm,
   over,
+  parseColor,
   polarityTokens,
+  tokenBlock,
+  tokensCss,
   type Polarity,
   type RGB,
+  type RGBA,
 } from './colorMath';
 
 const TOKENS = polarityTokens();
@@ -216,5 +220,98 @@ describe('advisory: bright objects behind glass and cards', () => {
     }
     for (const [k, w] of Object.entries(worst)) console.log(`behind ${k.padEnd(24)} ${w.v.toFixed(2)}:1 at ${hhmm(w.m)}`);
     for (const [k, w] of Object.entries(worst)) expect(w.v, k).toBeGreaterThanOrEqual(4.0);
+  });
+});
+
+// v5 clear liquid glass (docs/v5-spec.md section 1). The glass adds only a little white, so the label
+// ink (--lg-ink) is judged against the sky behind it, composited the way the CSS stacks it: the thin
+// scrim the app writes per minute (--sky-lg-scrim), then the glass fill. The spec's "raw sky" and
+// "sky blended with 22% white" are the two ends of that; the strict test is each ink at the weakest
+// real lift for it: navy at the fill's 6% bottom edge, white at the selected or hovered option (fill
+// centre plus bead centre, 40% in light and 23% in dark, derived from tokens.css below). Samples: the
+// scene gradient (top 0%, mid 55%, horizon 100%) at the heights the controls use, in two zones: the
+// mode selector and desktop tabs (top to 40%) and the phone Sounds and stopwatch pills (55% to 85%).
+// The horizon colour itself is not tested: nothing glass sits at the very bottom (the tab bar is solid).
+describe('clear glass labels (v5): --lg-ink over the sky at every minute', () => {
+  const css = tokensCss();
+  const light = tokenBlock(css, ':root');
+  const dark = tokenBlock(css, ":root[data-theme='dark']");
+  const alphas = (v: string) => [...v.matchAll(/rgba\(255,\s*255,\s*255,\s*([\d.]+)\)/g)].map((m) => parseFloat(m[1]!));
+  const mean = (a: number[]) => a.reduce((x, y) => x + y, 0) / a.length;
+  const stack = (below: number, above: number) => 1 - (1 - below) * (1 - above);
+  const lifts = (t: Record<string, string>) => {
+    const fill = alphas(t['--lg-fill']!);
+    const bead = alphas(t['--lg-bead']!);
+    return { plain: Math.min(...fill), selected: stack(mean(fill), mean(bead)), hover: stack(mean(fill), parseFloat(/([\d.]+)\)$/.exec(t['--lg-hover']!)![1]!)) };
+  };
+  const LIFT = { light: lifts(light), dark: lifts(dark) };
+  const lerp = (a: RGB, b: RGB, t: number): RGB => [0, 1, 2].map((i) => a[i]! + (b[i]! - a[i]!) * t) as RGB;
+  // the mode selector and desktop tabs sit in the upper part of the sky, the phone pills in the lower
+  const ZONES = { top: [0, 0.05, 0.2, 0.3, 0.4], low: [0.55, 0.6, 0.7, 0.8, 0.85] } as const;
+
+  const worstAt = (skyMin: number, polarity: 'light' | 'dark', zone: 'top' | 'low') => {
+    const s = skyAt(skyMin, new Date(2026, 9, 14, 12));
+    const sky = blendAt(skyMin);
+    const under: RGB[] = ZONES[zone].map((y) => (y <= 0.55 ? lerp(sky.top, sky.mid, y / 0.55) : lerp(sky.mid, sky.horizon, (y - 0.55) / 0.45)));
+    const inkHex = zone === 'top' ? s.glassInk : s.glassInkLow;
+    const scrimCss = zone === 'top' ? s.glassScrim : s.glassScrimLow;
+    const ink = hexRgb(inkHex);
+    const scrim: RGBA | null = scrimCss === 'transparent' ? null : parseColor(scrimCss);
+    const l = LIFT[polarity];
+    const lift = (w: number): RGBA => [255, 255, 255, w];
+    let worst = Infinity;
+    // the plain label sits on the fill; a selected or hovered one on fill plus bead or hover
+    for (const w of [l.plain, l.selected, l.hover]) {
+      for (const u of under) worst = Math.min(worst, contrast(ink, over(lift(w), scrim ? over(scrim, u) : u)));
+    }
+    return { worst, ink: inkHex, scrim: scrim ? scrim[3] : 0 };
+  };
+
+  const sweepGlass = (mode: 'sky' | 'light' | 'dark') => {
+    let min = Infinity;
+    let at = 0;
+    let scrimMinutes = 0;
+    let maxScrim = 0;
+    for (let m = 0; m < 1440; m++) {
+      const skyMin = mode === 'light' ? 750 : mode === 'dark' ? 150 : m;
+      const pol = mode === 'sky' ? polarityFor(m) : mode;
+      for (const zone of ['top', 'low'] as const) {
+        const r = worstAt(skyMin, pol, zone);
+        if (r.worst < min) {
+          min = r.worst;
+          at = m;
+        }
+        if (r.scrim > 0) scrimMinutes++;
+        maxScrim = Math.max(maxScrim, r.scrim);
+      }
+    }
+    return { min, at, scrimMinutes, maxScrim };
+  };
+
+  it.each(['sky', 'light', 'dark'] as const)('mode %s: every label stays at or above 4.5:1 (worst minute printed)', (mode) => {
+    const r = sweepGlass(mode);
+    console.log(`worst lg.ink [${mode}] ${r.min.toFixed(2)}:1 at ${hhmm(r.at)}; scrim in ${r.scrimMinutes} min, at most ${r.maxScrim}`);
+    expect(r.min).toBeGreaterThanOrEqual(4.5);
+  });
+  it('the glass stays clear: no scrim in the fixed light and dark modes, and in under a third of the day (per zone) when following the sky', () => {
+    expect(sweepGlass('light').scrimMinutes).toBe(0);
+    expect(sweepGlass('dark').scrimMinutes).toBe(0);
+    const sky = sweepGlass('sky');
+    expect(sky.scrimMinutes).toBeLessThan(2 * 1440 * 0.34);
+    expect(sky.maxScrim).toBeLessThanOrEqual(0.5);
+  });
+  it('the unscrimmed ink of the spec would fail without the per-minute pick', () => {
+    // documents why platform/sky.ts writes --sky-lg-ink and --sky-lg-scrim: navy on the 16:59 top is under 4.5 even with the fill
+    const sky = blendAt(16 * 60 + 59);
+    const navyOnTop = contrast(hexRgb('#10263F'), over([255, 255, 255, LIFT.light.plain], sky.top));
+    expect(navyOnTop).toBeLessThan(4.5);
+  });
+  it('tokens: light ink falls back to --sky-ink, dark ink to #eef5ff, and the lg values match the approved mockup', () => {
+    expect(light['--lg-ink']).toBe('var(--sky-lg-ink, var(--sky-ink))');
+    expect(dark['--lg-ink']).toBe('var(--sky-lg-ink, #eef5ff)');
+    expect(alphas(light['--lg-fill']!)).toEqual([0.22, 0.06]);
+    expect(alphas(dark['--lg-fill']!)).toEqual([0.13, 0.04]);
+    expect(light['--lg-blur']).toBe('blur(14px) saturate(115%)');
+    expect(dark['--lg-blur']).toBe('blur(12px) saturate(160%)');
   });
 });

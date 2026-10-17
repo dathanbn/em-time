@@ -117,6 +117,8 @@ export const SKY_KEYFRAMES: readonly SkyKeyframe[] = [
 /** Polarity snap times: light from 05:15 to 16:59, dark otherwise. */
 export const POLARITY_FLIP_MIN = { toLight: 315, toDark: 1020 } as const;
 export const SKY_INK = { dark: '#10263F', light: '#FFFFFF' } as const;
+/** Label ink on clear glass (v5): navy, or the near-white of the dark theme. */
+export const GLASS_INK = { navy: '#10263F', white: '#EEF5FF' } as const;
 
 /** Pinned clocks for the fixed theme modes: 12:30 and 02:30. */
 const PIN_LIGHT = 750;
@@ -215,6 +217,63 @@ export function composite(rgba: string, under: string): string {
   return `#${[f(r, R), f(g, G), f(b, B)].map((v) => v.toString(16).padStart(2, '0')).join('')}`.toUpperCase();
 }
 
+// ---- clear glass -------------------------------------------------------------------------------
+
+const GLASS_TARGET = 4.6; // above the 4.5:1 floor so rounding cannot tip it under
+/**
+ * Where the clear glass sits on the sky gradient, as fractions of the viewport height: the mode
+ * selector and desktop tabs in the upper part, the phone Sounds and stopwatch pills in the lower.
+ */
+const GLASS_ZONES = { top: [0, 0.2, 0.3, 0.4], low: [0.55, 0.7, 0.8, 0.85] } as const;
+/** White the glass itself adds under a label: a plain label (fill) and a selected or hovered one (bead), per polarity. */
+const GLASS_LIFT = { light: [0.06, 0.4], dark: [0.04, 0.23] } as const;
+
+const lerpHex = (a: string, b: string, t: number): string => {
+  const A = hexToRgb(a);
+  const B = hexToRgb(b);
+  return `#${A.map((v, i) => Math.round(v + (B[i]! - v) * t).toString(16).padStart(2, '0')).join('')}`;
+};
+
+/**
+ * Clear glass keeps almost nothing under its labels, so the label ink is picked per minute: navy or
+ * white, whichever needs the thinner scrim, plus (only where neither reaches 4.5:1 over the sky behind
+ * the glass) a scrim of the opposite tone under it. The sky is sampled down the scene gradient
+ * (top 0%, mid 55%, horizon 100%) at the heights of one zone.
+ */
+export function glassFor(
+  sky: { top: string; mid: string; horizon: string },
+  polarity: Polarity,
+  preferNavy: boolean,
+  zone: keyof typeof GLASS_ZONES,
+): { ink: string; scrim: string } {
+  const under = GLASS_ZONES[zone].map((y) =>
+    y <= 0.55 ? lerpHex(sky.top, sky.mid, y / 0.55) : lerpHex(sky.mid, sky.horizon, (y - 0.55) / 0.45),
+  );
+  const [plain, bead] = GLASS_LIFT[polarity];
+  const order = preferNavy ? (['navy', 'white'] as const) : (['white', 'navy'] as const);
+  let best = { ink: GLASS_INK.navy as string, scrim: 'transparent', alpha: Infinity };
+  for (const tone of order) {
+    const ink = GLASS_INK[tone];
+    const base = tone === 'navy' ? '255,255,255' : '8,16,40';
+    const lift = tone === 'navy' ? plain : bead;
+    for (let a = 0; a <= 0.7001 && a < best.alpha; a += 0.05) {
+      const alpha = Math.round(a * 100) / 100;
+      const ok = under.every(
+        (u) =>
+          contrastRatio(
+            ink,
+            composite(`rgba(255,255,255,${lift})`, alpha ? composite(`rgba(${base},${alpha})`, u) : u),
+          ) >= GLASS_TARGET,
+      );
+      if (ok) {
+        best = { ink, scrim: alpha ? `rgba(${base},${alpha})` : 'transparent', alpha };
+        break;
+      }
+    }
+  }
+  return { ink: best.ink, scrim: best.scrim };
+}
+
 // ---- state -----------------------------------------------------------------------------------
 
 export interface BodyState {
@@ -240,6 +299,10 @@ export interface SkyState {
   cloudOpacity: number;
   starOpacity: number;
   ink: string;
+  glassInk: string;
+  glassScrim: string;
+  glassInkLow: string;
+  glassScrimLow: string;
   sun: BodyState;
   moon: BodyState & { illumination: number; waxing: boolean };
 }
@@ -306,14 +369,19 @@ export function skyAt(minutes: number, date: Date = new Date()): SkyState {
     Math.min(contrastRatio(SKY_INK.light, top), contrastRatio(SKY_INK.light, mid))
     ? SKY_INK.dark
     : SKY_INK.light;
+  const horizon = mixHex(A.horizon, B.horizon, k);
+  const polarity = polarityAt(t);
+  const navy = ink === SKY_INK.dark;
+  const glass = glassFor({ top, mid, horizon }, polarity, navy, 'top');
+  const glassLow = glassFor({ top, mid, horizon }, polarity, navy, 'low');
   const moonElapsed = t >= MOON_START ? t - MOON_START : t + 1440 - MOON_START;
   return {
     minutes: t,
     phase: nearestPhase(t),
-    polarity: polarityAt(t),
+    polarity,
     top,
     mid,
-    horizon: mixHex(A.horizon, B.horizon, k),
+    horizon,
     hillBack: mixHex(A.hillBack, B.hillBack, k),
     hillFront: mixHex(A.hillFront, B.hillFront, k),
     sunInner: mixHex(A.sunInner, B.sunInner, k),
@@ -324,6 +392,10 @@ export function skyAt(minutes: number, date: Date = new Date()): SkyState {
     cloudOpacity: round(num(A.cloudOpacity, B.cloudOpacity, k)),
     starOpacity: round(num(A.starOpacity, B.starOpacity, k)),
     ink,
+    glassInk: glass.ink,
+    glassScrim: glass.scrim,
+    glassInkLow: glassLow.ink,
+    glassScrimLow: glassLow.scrim,
     sun: body(t - SUN_START, SUN_SPAN),
     moon: { ...body(moonElapsed, MOON_SPAN), ...moonPhase(date) },
   };
@@ -372,6 +444,10 @@ export function applySky(state: SkyState, root: HTMLElement = document.documentE
   set('--sky-hill-back', state.hillBack);
   set('--sky-hill-front', state.hillFront);
   set('--sky-ink', state.ink);
+  set('--sky-lg-ink', state.glassInk);
+  set('--sky-lg-scrim', state.glassScrim);
+  set('--sky-lg-ink-low', state.glassInkLow);
+  set('--sky-lg-scrim-low', state.glassScrimLow);
   set('--sky-ink-shadow', state.ink === SKY_INK.dark ? 'rgba(255,255,255,0.5)' : 'rgba(10,22,50,0.5)');
   set('--sky-sun-inner', state.sunInner);
   set('--sky-sun-outer', state.sunOuter);

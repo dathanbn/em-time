@@ -45,6 +45,26 @@
   --em-border: rgba(19, 32, 47, 0.09);
   --em-scrim: rgba(15, 30, 55, 0.36);
 
+  /* clear liquid glass (v5): mode selector, desktop nav tabs, phone tool pills */
+  --lg-fill: linear-gradient(180deg, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0.06) 100%);
+  --lg-rim: rgba(255, 255, 255, 0.45);
+  --lg-blur: blur(14px) saturate(115%);
+  --lg-depth:
+    inset 0 1px 0 rgba(255, 255, 255, 0.85), inset 0 -1px 0 rgba(255, 255, 255, 0.22),
+    inset 0 0 14px rgba(255, 255, 255, 0.18), 0 6px 22px rgba(16, 38, 63, 0.1);
+  --lg-bead: linear-gradient(180deg, rgba(255, 255, 255, 0.42) 0%, rgba(255, 255, 255, 0.18) 100%);
+  --lg-bead-depth:
+    inset 0 1px 0 rgba(255, 255, 255, 1), inset 0 -2px 6px rgba(255, 255, 255, 0.35),
+    0 2px 10px rgba(16, 38, 63, 0.12);
+  --lg-hover: rgba(255, 255, 255, 0.22);
+  --lg-ink: var(--sky-lg-ink, var(--sky-ink));
+  /* thin tone under the glass, written per minute by platform/sky.ts only where the sky leaves the ink under 4.5:1 */
+  --lg-scrim: var(--sky-lg-scrim, transparent);
+  --lg-base: var(--lg-fill), var(--lg-scrim);
+  /* the phone pills sit lower on the sky gradient and get their own ink and scrim (.toolrow) */
+  --lg-ink-low: var(--sky-lg-ink-low, var(--sky-ink));
+  --lg-scrim-low: var(--sky-lg-scrim-low, transparent);
+
   /* ink */
   --em-ink: #13202f;
   --em-ink-2: #475569;
@@ -178,6 +198,20 @@
   --em-border: rgba(156, 211, 245, 0.12);
   --em-scrim: rgba(0, 0, 0, 0.55);
 
+  --lg-fill: linear-gradient(180deg, rgba(255, 255, 255, 0.13) 0%, rgba(255, 255, 255, 0.04) 100%);
+  --lg-rim: rgba(255, 255, 255, 0.2);
+  --lg-blur: blur(12px) saturate(160%);
+  --lg-depth:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28), inset 0 0 14px rgba(255, 255, 255, 0.05),
+    0 6px 22px rgba(0, 0, 0, 0.25);
+  --lg-bead: linear-gradient(180deg, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0.09) 100%);
+  --lg-bead-depth:
+    inset 0 1px 0 rgba(255, 255, 255, 0.45), inset 0 -2px 6px rgba(255, 255, 255, 0.06),
+    0 2px 10px rgba(0, 0, 0, 0.3);
+  --lg-hover: rgba(255, 255, 255, 0.08);
+  --lg-ink: var(--sky-lg-ink, #eef5ff);
+  --lg-ink-low: var(--sky-lg-ink-low, #eef5ff);
+
   --em-ink: #e6eef7;
   --em-ink-2: #a9b8cc;
   --em-ink-3: #8c9db4;
@@ -234,11 +268,30 @@
     --em-glass: rgba(255, 255, 255, 0.9);
     --em-glass-hi: rgba(255, 255, 255, 0.94);
     --em-surface: rgba(255, 255, 255, 0.97);
+    /* clear glass needs the blur to be readable: fall back to an opaque pill with the card ink */
+    --lg-fill: linear-gradient(rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.92));
+    --lg-scrim: transparent;
+    --lg-scrim-low: transparent;
+    --lg-rim: var(--em-glass-border);
+    --lg-blur: none;
+    --lg-bead: var(--em-accent-soft);
+    --lg-bead-depth: inset 0 0 0 1.5px var(--em-accent-text);
+    --lg-hover: var(--em-accent-soft);
+    --lg-ink: var(--em-ink);
+    --lg-ink-low: var(--em-ink);
   }
   :root[data-theme='dark'] {
     --em-glass: rgba(18, 27, 43, 0.9);
     --em-glass-hi: rgba(18, 27, 43, 0.94);
     --em-surface: rgba(18, 27, 43, 0.97);
+    --lg-fill: linear-gradient(rgba(18, 27, 43, 0.92), rgba(18, 27, 43, 0.92));
+    --lg-scrim: transparent;
+    --lg-scrim-low: transparent;
+    --lg-bead: var(--em-accent-soft);
+    --lg-bead-depth: inset 0 0 0 1.5px var(--em-accent-text);
+    --lg-hover: var(--em-accent-soft);
+    --lg-ink: var(--em-ink);
+    --lg-ink-low: var(--em-ink);
   }
 }
 
@@ -251,6 +304,14 @@
     --em-surface-solid: Canvas;
     --em-surface-sunk: Canvas;
     --em-glass-border: CanvasText;
+    --lg-fill: linear-gradient(Canvas, Canvas);
+    --lg-scrim: transparent;
+    --lg-scrim-low: transparent;
+    --lg-rim: CanvasText;
+    --lg-ink: CanvasText;
+    --lg-ink-low: CanvasText;
+    --lg-bead: Highlight;
+    --lg-hover: Canvas;
     --em-border: CanvasText;
     --em-ink: CanvasText;
     --em-ink-2: CanvasText;

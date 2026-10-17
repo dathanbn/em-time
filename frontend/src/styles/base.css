@@ -197,6 +197,12 @@ html[data-hidden] .burst * {
     stroke: CanvasText;
     stroke-width: 1px;
   }
+  .modes .seg__opt[aria-checked='true'],
+  .nchip:not([data-state='off']) {
+    forced-color-adjust: none;
+    background: Highlight;
+    color: HighlightText;
+  }
   .tbar__bar,
   .wk-col {
     forced-color-adjust: none;
