@@ -77,6 +77,16 @@ export default defineConfig({
             handler: 'CacheFirst',
             options: { cacheName: 'em-time-sync', expiration: { maxEntries: 6 } },
           },
+          // Focus sounds (recorded loops) are not precached; each is kept after it first plays, so it works offline.
+          {
+            urlPattern: ({ url }) => url.pathname.includes('/sounds/') && url.pathname.endsWith('.m4a'),
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'em-time-sounds',
+              cacheableResponse: { statuses: [0, 200] },
+              expiration: { maxEntries: 12 },
+            },
+          },
         ],
         cleanupOutdatedCaches: true,
       },

@@ -4,7 +4,8 @@ import type { ChimeId } from '@core';
 
 let ctx: AudioContext | null = null;
 
-function getCtx(): AudioContext | null {
+/** The one shared context: chimes and focus sounds (platform/noise.ts) both play through it. */
+export function getAudioCtx(): AudioContext | null {
   if (ctx) return ctx;
   const Ctor =
     window.AudioContext ??
@@ -20,7 +21,7 @@ function getCtx(): AudioContext | null {
 
 /** Call from a click or key handler. */
 export function unlockAudio(): void {
-  const c = getCtx();
+  const c = getAudioCtx();
   if (c && c.state === 'suspended') void c.resume().catch(() => undefined);
 }
 
@@ -61,7 +62,7 @@ const RECIPES: Record<Exclude<ChimeId, 'none'>, Partial[]> = {
 
 export function playChime(id: ChimeId, volume: number): void {
   if (id === 'none' || volume <= 0) return;
-  const c = getCtx();
+  const c = getAudioCtx();
   if (!c) return;
   if (c.state === 'suspended') void c.resume().catch(() => undefined);
   const master = c.createGain();

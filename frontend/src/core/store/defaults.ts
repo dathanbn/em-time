@@ -6,6 +6,8 @@ import {
   DEFAULT_DAILY_GOAL_MIN,
   DEFAULT_DISPLAY_NAME,
   DEFAULT_MASCOT,
+  DEFAULT_NOISE,
+  DEFAULT_NOISE_VOLUME,
   DEFAULT_STICKERS,
   DEFAULT_THEME,
   DEFAULT_LONG_EVERY,
@@ -59,6 +61,9 @@ export function createDefaultSettings(): Settings {
     displayName: DEFAULT_DISPLAY_NAME,
     mascot: DEFAULT_MASCOT,
     stickers: DEFAULT_STICKERS,
+    noiseOn: false,
+    noise: DEFAULT_NOISE,
+    noiseVolume: DEFAULT_NOISE_VOLUME,
   };
 }
 

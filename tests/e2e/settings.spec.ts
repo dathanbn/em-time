@@ -132,7 +132,7 @@ test.describe('settings: sound and notifications (SND-1, SND-2, NTF-3)', () => {
     await expect(group.getByRole('radio', { name: 'Glass' })).toBeChecked();
     await expect(page.getByRole('button', { name: 'Preview None' })).toBeDisabled();
     for (const n of ['Glass', 'Bowl', 'Bell', 'Wood']) await expect(page.getByRole('button', { name: `Preview ${n}` })).toBeEnabled();
-    const vol = page.getByRole('slider', { name: 'Volume' });
+    const vol = page.getByRole('slider', { name: 'Volume', exact: true }); // the Focus sounds slider is "Focus sounds volume"
     await expect(vol).toHaveValue('60');
     await expect(vol).toHaveAttribute('min', '0');
     await expect(vol).toHaveAttribute('max', '100');
@@ -156,7 +156,7 @@ test.describe('settings: sound and notifications (SND-1, SND-2, NTF-3)', () => {
     await vol.fill('0');
     expect((await stored(page)).settings.volume).toBe(0);
     await page.reload();
-    await expect(page.getByRole('slider', { name: 'Volume' })).toHaveValue('0');
+    await expect(page.getByRole('slider', { name: 'Volume', exact: true })).toHaveValue('0');
     await expect(page.getByRole('radiogroup', { name: 'Chime' }).getByRole('radio', { name: 'Bowl' })).toBeChecked();
   });
 
@@ -487,12 +487,12 @@ test.describe('settings: your data (DAT-2, DAT-3, DAT-5)', () => {
 });
 
 test.describe('settings: about', () => {
-  test('the version, the seven shortcuts and the about line are present', async ({ page }) => {
+  test('the version, the eight shortcuts and the about line are present', async ({ page }) => {
     await boot(page, { route: 'settings' });
     await expect(page.locator('.about__ver')).toHaveText(/^Em Time \d+\.\d+\.\d+/);
     const rows = page.locator('.shortcuts__row');
-    await expect(rows).toHaveCount(7);
-    await expect(rows.locator('kbd')).toHaveText(['Space', 'S', 'R', '1', '2', '3', '?']);
+    await expect(rows).toHaveCount(8);
+    await expect(rows.locator('kbd')).toHaveText(['Space', 'S', 'R', 'N', '1', '2', '3', '?']);
     await expect(page.locator('.about__line')).not.toBeEmpty();
   });
 });

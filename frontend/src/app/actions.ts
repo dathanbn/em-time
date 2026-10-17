@@ -70,6 +70,14 @@ export function togglePlay(): void {
   }
 }
 
+/** The N shortcut. */
+export function toggleNoise(): void {
+  unlockAudio();
+  const on = !core.store.get().settings.noiseOn;
+  core.store.updateSettings({ noiseOn: on });
+  announce(on ? 'Focus sounds on' : 'Focus sounds off');
+}
+
 export function skip(): void {
   core.timer.skip();
   const p = core.timer.getState().phase;

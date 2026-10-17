@@ -7,6 +7,8 @@ export type CategoryColorSlot = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 export type PresetId = '25/5' | '50/10' | '90/20' | 'custom';
 export type ChimeId = 'glass' | 'bowl' | 'bell' | 'wood' | 'none';
 export type ThemeId = 'sky' | 'light' | 'dark';   // v2: 'sky' added and is the default
+export type NoiseId =                              // v4: focus sounds (3 synthesized, 6 recorded)
+  | 'white' | 'pink' | 'brown' | 'rain' | 'waves' | 'stream' | 'cafe' | 'fireplace' | 'night';
 export type TrendRange = 30 | 90 | 365;
 export type HeatLevel = 0 | 1 | 2 | 3 | 4;
 export type StorageStatus = 'ok' | 'quota' | 'unavailable' | 'read-only-newer';
@@ -68,6 +70,9 @@ export interface Settings {
   keepAwake: boolean;
   mascot: boolean;            // v2, device-only. Default true.
   stickers: boolean;          // v2, device-only. Default true.
+  noiseOn: boolean;           // v4, device-only. Focus sounds on. Default false.
+  noise: NoiseId;             // v4, device-only. Default 'rain'.
+  noiseVolume: number;        // v4, device-only. 0..1, default 0.5 (separate from chime volume).
 }
 
 export interface TimerState {

@@ -4,6 +4,7 @@ export interface ShortcutHandlers {
   toggle(): void;
   skip(): void;
   reset(): void;
+  noise(): void;
   mode(phase: 'focus' | 'short' | 'long'): void;
   help(): void;
 }
@@ -52,6 +53,11 @@ export function initShortcuts(h: ShortcutHandlers): () => void {
       case 'R':
         e.preventDefault();
         h.reset();
+        break;
+      case 'n':
+      case 'N':
+        e.preventDefault();
+        h.noise();
         break;
       case '1':
         h.mode('focus');

@@ -322,8 +322,9 @@ test.describe('MASCOT-4 Cloud friend off', () => {
     };
     const on = await measure(true);
     const off = await measure(false);
-    expect(on.children).toBe(2);
-    expect(off.children).toBe(1);
+    // the header also holds the Focus sounds chip (v4): greeting + chip (+ the cloud)
+    expect(on.children).toBe(3);
+    expect(off.children).toBe(2);
     expect(off.greeting).toBeLessThan(on.greeting); // fewer lines
     expect(off.textW).toBeGreaterThan(on.textW + 40);
   });

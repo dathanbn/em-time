@@ -1,4 +1,4 @@
-import { APP_ID, FUTURE_TOLERANCE_MS, LIMITS, PRESETS, SCHEMA_VERSION } from '../constants';
+import { APP_ID, FUTURE_TOLERANCE_MS, LIMITS, NOISE_IDS, PRESETS, SCHEMA_VERSION } from '../constants';
 import { dayKey, isValidDay } from '../time/calendar';
 import {
   createDefaultCategories,
@@ -15,6 +15,7 @@ import type {
   ChimeId,
   EntityMeta,
   Meta,
+  NoiseId,
   PresetId,
   Session,
   Settings,
@@ -170,6 +171,9 @@ export function validateSettings(x: unknown): Settings {
     displayName: normalizeDisplayName(x.displayName) ?? d.displayName,
     mascot: bool(x.mascot, d.mascot),
     stickers: bool(x.stickers, d.stickers),
+    noiseOn: bool(x.noiseOn, d.noiseOn),
+    noise: NOISE_IDS.includes(x.noise as NoiseId) ? (x.noise as NoiseId) : d.noise,
+    noiseVolume: isNum(x.noiseVolume) ? clamp(x.noiseVolume, LIMITS.noiseVolume) : d.noiseVolume,
   };
 }
 

@@ -1,4 +1,4 @@
-import { CORRUPT_KEY_PREFIX, LIMITS, PRESETS, SYNCED_SETTINGS_KEYS } from '../constants';
+import { CORRUPT_KEY_PREFIX, LIMITS, NOISE_IDS, PRESETS, SYNCED_SETTINGS_KEYS } from '../constants';
 import { exportData, mergeData } from '../storage/exportImport';
 import { applyRemoteRow } from '../storage/lww';
 import { saveData } from '../storage/persist';
@@ -322,7 +322,7 @@ export function createStore(opts: {
       const cur = data.settings;
       const next: Settings = { ...cur };
       const ranged = ['focusMin', 'shortMin', 'longMin', 'longEvery', 'dailyGoalMin'] as const;
-      const bools = ['autoStart', 'breakPrompts', 'encouragement', 'notifications', 'keepAwake'] as const;
+      const bools = ['autoStart', 'breakPrompts', 'encouragement', 'notifications', 'keepAwake', 'noiseOn'] as const;
       for (const k of ranged) {
         const v = patch[k];
         if (v === undefined) continue;
@@ -334,6 +334,12 @@ export function createStore(opts: {
       }
       if (patch.volume !== undefined && !(patch.volume >= 0 && patch.volume <= 1)) {
         throw new ValidationError('volume', 'limit');
+      }
+      if (patch.noiseVolume !== undefined && !(patch.noiseVolume >= 0 && patch.noiseVolume <= 1)) {
+        throw new ValidationError('noiseVolume', 'limit');
+      }
+      if (patch.noise !== undefined && !(NOISE_IDS as readonly string[]).includes(patch.noise)) {
+        throw new ValidationError('noise', 'required');
       }
       if (patch.weekStartsOn !== undefined && patch.weekStartsOn !== 0 && patch.weekStartsOn !== 1) {
         throw new ValidationError('weekStartsOn', 'limit');

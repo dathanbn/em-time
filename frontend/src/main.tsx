@@ -8,6 +8,7 @@ import { createEmCore, type Copy, type EmCore } from '@core';
 import messages from './data/messages.json';
 import { App } from './app/App';
 import { initPhaseEffects } from './app/actions';
+import { initNoise } from './app/noise';
 import { initBridge, core, timerState } from './app/coreBridge';
 import { initRouter } from './app/router';
 import { initPwa } from './platform/pwa';
@@ -17,7 +18,7 @@ import { initFirstOpenWave } from './app/mascotState';
 import { initShortcuts } from './platform/shortcuts';
 import { initTitle } from './platform/title';
 import { initWakeLock } from './platform/wakeLock';
-import { shortcutsOpen, skip, reset, switchMode, togglePlay } from './app/actions';
+import { shortcutsOpen, skip, reset, switchMode, toggleNoise, togglePlay } from './app/actions';
 
 async function boot(): Promise<void> {
   const copy = messages as unknown as Copy;
@@ -37,6 +38,7 @@ async function boot(): Promise<void> {
   initBridge(em);
   initRouter();
   initPhaseEffects();
+  initNoise();
   initTitle();
   initWakeLock();
   startSky(
@@ -49,6 +51,7 @@ async function boot(): Promise<void> {
     toggle: togglePlay,
     skip,
     reset,
+    noise: toggleNoise,
     mode: switchMode,
     help: () => {
       shortcutsOpen.value = true;

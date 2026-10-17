@@ -1,4 +1,4 @@
-import { useRef, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import {
   DAILY_GOAL_STEP_MIN,
   IMPORT_MAX_BYTES,
@@ -20,6 +20,7 @@ import {
 } from '@core';
 import { ExportReminder, exportBackup } from '../app/Banners';
 import { breakPrompt, message } from '../app/actions';
+import { loadNoiseUi, noiseUi } from '../app/noise';
 import { core, data } from '../app/coreBridge';
 import { useNarrow } from '../app/useNarrow';
 import { Companion } from '../components/Companion';
@@ -36,6 +37,7 @@ export const SHORTCUTS: [string, string][] = [
   ['Space', 'Start, pause or resume'],
   ['S', 'Skip to the next phase'],
   ['R', 'Reset the current phase'],
+  ['N', 'Turn focus sounds on or off'],
   ['1', 'Focus'],
   ['2', 'Short break'],
   ['3', 'Long break'],
@@ -658,6 +660,8 @@ export function ShortcutsList() {
 
 export function Settings() {
   const s = data.value.settings;
+  const Noise = noiseUi.value?.NoiseSettings;
+  useEffect(loadNoiseUi, []);
   const syncOn = isSyncConfigured(readSyncEnv());
   const narrow = useNarrow();
   return (
@@ -674,6 +678,7 @@ export function Settings() {
         <TimerCard s={s} />
         <GoalCard s={s} />
         <SoundCard s={s} />
+        {Noise ? <Noise /> : null}
         <NotificationsCard s={s} />
         <MessagesCard s={s} />
         <AppearanceCard s={s} />

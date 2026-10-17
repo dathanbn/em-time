@@ -14,6 +14,8 @@ import {
   togglePlay,
 } from '../app/actions';
 import { clockTick, core, data, timerState, track } from '../app/coreBridge';
+import { loadNoiseUi, noiseState, noiseUi } from '../app/noise';
+import { noiseInfo } from '../app/noiseInfo';
 import { greetingFor, type SkyCopy } from '../app/greeting';
 import { currentTask, openTasks, plural } from '../app/selectors';
 import { useNarrow } from '../app/useNarrow';
@@ -401,9 +403,44 @@ function Greeting() {
   );
 }
 
+/** Header pill: shows the chosen sound and opens the Focus sounds sheet. */
+function NoiseChip({ onOpen }: { onOpen: () => void }) {
+  const { noiseOn, noise } = data.value.settings;
+  const [label, emoji] = noiseInfo(noise);
+  return (
+    <button
+      type="button"
+      class="nchip"
+      data-testid="noise-chip"
+      data-state={noiseOn ? noiseState.value.status : 'off'}
+      aria-label={noiseOn ? `Focus sounds: ${label}, on` : 'Focus sounds: off'}
+      aria-haspopup="dialog"
+      onPointerEnter={loadNoiseUi}
+      onClick={() => {
+        loadNoiseUi();
+        onOpen();
+      }}
+    >
+      {noiseOn ? (
+        <span aria-hidden="true">{emoji}</span>
+      ) : (
+        <Icon name="volume-off" size={18} />
+      )}
+      <span class="nchip__label">{noiseOn ? label : 'Sounds'}</span>
+      <span class="eq" aria-hidden="true">
+        <i />
+        <i />
+        <i />
+      </span>
+    </button>
+  );
+}
+
 export function Timer() {
   const s = timerState.value;
   const [picker, setPicker] = useState(false);
+  const [sounds, setSounds] = useState(false);
+  const NoisePicker = noiseUi.value?.NoisePicker;
   const narrow = useNarrow();
   const isBreak = s.phase !== 'focus';
   const msg = message.value;
@@ -414,6 +451,7 @@ export function Timer() {
       <div class="timerpage__main">
         <header class="thead">
           <Greeting />
+          <NoiseChip onOpen={() => setSounds(true)} />
           {narrow ? <Companion size={68} mirror class="thead__mascot" /> : null}
         </header>
         <Segmented
@@ -463,6 +501,7 @@ export function Timer() {
         </div>
       </aside>
       {picker ? <TaskPicker onClose={() => setPicker(false)} /> : null}
+      {sounds && NoisePicker ? <NoisePicker onClose={() => setSounds(false)} /> : null}
     </div>
   );
 }
