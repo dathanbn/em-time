@@ -44,7 +44,7 @@ describe('deriveSyncCredentials', () => {
     expect(r).toEqual({
       ok: true,
       credentials: {
-        email: 'blue-sky-diary@emtime.local',
+        email: 'blue-sky-diary@dathanbn.github.io',
         password: sha('em-time:v1:blue.sky-diary'),
       },
     });
@@ -127,7 +127,7 @@ describe('engine.signInWithCode', () => {
     expect(
       server.log.filter((o) => o.kind === 'signInWithPassword' || o.kind === 'signUp').map((o) => o.kind),
     ).toEqual(['signInWithPassword', 'signUp']);
-    expect(server.passwords.has('brand-new-code@emtime.local')).toBe(true);
+    expect(server.passwords.has('brand-new-code@dathanbn.github.io')).toBe(true);
     await flush();
     await e.syncNow();
     expect([...server.tables.tasks.values()].map((r) => r.name)).toEqual(['Local first']);
@@ -135,7 +135,7 @@ describe('engine.signInWithCode', () => {
     // the code and password never reach AppData
     const json = JSON.stringify(store.get());
     expect(json).not.toContain('brand-new-code');
-    expect(json).not.toContain(server.passwords.get('brand-new-code@emtime.local')!);
+    expect(json).not.toContain(server.passwords.get('brand-new-code@dathanbn.github.io')!);
   });
 
   it('a second device with the same code (any casing) lands in the same account', async () => {

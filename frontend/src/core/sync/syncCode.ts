@@ -4,7 +4,9 @@
 export const SYNC_CODE_MIN = 8;
 export const SYNC_CODE_MAX = 64; // the email local part may not exceed 64 characters
 
-export const SYNC_CODE_EMAIL_DOMAIN = '@emtime.local';
+// Supabase rejects reserved TLDs such as .local, so the address lives on the site's own domain.
+// Nothing is ever sent to it (Confirm email is off).
+export const SYNC_CODE_EMAIL_DOMAIN = '@dathanbn.github.io';
 
 export type SyncCodeError = 'code_empty' | 'code_too_short' | 'code_too_long' | 'code_invalid_chars';
 
