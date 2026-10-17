@@ -23,7 +23,7 @@ const ok = (r: ImportResult) => {
 };
 
 describe('DAT-3 import fixtures', () => {
-  it('backup-valid.json: accepted with a full summary and no warnings', () => {
+  it('backup-valid.json (a v1 export): accepted with a full summary, one migration notice, and v2 defaults', () => {
     const src = json('backup-valid.json');
     const r = ok(parseImport(text('backup-valid.json'), NOW));
     expect(r.summary.sessions).toBe(src.sessions.length);
@@ -32,7 +32,11 @@ describe('DAT-3 import fixtures', () => {
     expect(r.summary.firstDay).toBe(days[0]);
     expect(r.summary.lastDay).toBe(days[days.length - 1]);
     expect(r.summary.tasks).toBeGreaterThanOrEqual(4);
-    expect(r.warnings).toEqual([]);
+    // the v1 fixture is a v1 document, so the only warning is the v1 to v2 migration notice
+    expect(r.warnings).toEqual([{ code: 'migrated', from: 1 }]);
+    expect(r.data.schemaVersion).toBe(2);
+    expect(src.settings.theme).toBe('light'); // the fixture itself stays a genuine v1 file
+    expect(r.data.settings).toMatchObject({ theme: 'sky', displayName: 'Em', mascot: true, stickers: true });
     expect(r.data.sessions).toHaveLength(src.sessions.length);
     expect(r.data.sessions.every((s, i, a) => i === 0 || a[i - 1]!.startedAt <= s.startedAt)).toBe(true);
   });
@@ -60,7 +64,7 @@ describe('DAT-3 import fixtures', () => {
   it('backup-v0.json: migrated through the hook and reported', () => {
     const r = ok(parseImport(text('backup-v0.json'), NOW));
     expect(r.warnings).toContainEqual({ code: 'migrated', from: 0 });
-    expect(r.data.schemaVersion).toBe(1);
+    expect(r.data.schemaVersion).toBe(2); // v0 runs through the hook and on to the current version
     expect(r.data.sessions).toHaveLength(7);
   });
 

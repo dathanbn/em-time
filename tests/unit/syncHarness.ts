@@ -11,10 +11,16 @@ import type {
   SyncDeps,
   SyncTable,
 } from '@core';
+import { createHash } from 'node:crypto';
 import { createSyncEngine, type SyncEngine } from '../../frontend/src/core/sync/engine';
 import { FakeClock, makeCore } from './harness';
 
 type Row = Record<string, any>;
+
+/** QA's own derivation of the v3 credentials from design: email slug (spaces to dashes, dots to dashes) at emtime.local, password SHA-256 of "em-time:v1:" + code. */
+export const normalizeCode = (raw: string): string => raw.trim().toLowerCase().replace(/\s+/g, '-');
+export const syncEmail = (raw: string): string => `${normalizeCode(raw).replace(/\./g, '-')}@emtime.local`;
+export const syncPassword = (raw: string): string => createHash('sha256').update(`em-time:v1:${normalizeCode(raw)}`).digest('hex');
 
 export class FakeServer {
   tables: Record<SyncTable, Map<string, Row>> = {
@@ -29,7 +35,13 @@ export class FakeServer {
   failAll = false;
   hold: null | Promise<void> = null;
   users = new Map<string, string>(); // email -> uid
-  validCode = '123456';
+  /** email -> password, as the auth server stores them (v3: a sync code derives both). */
+  accounts = new Map<string, string>();
+  /** The Supabase "Confirm email" setting. When on, sign-up returns a user but no session. */
+  confirmEmail = false;
+  confirmed = new Set<string>();
+  /** Auth requests the client made, in order (the derived email and password are recorded for the privacy tests). */
+  authCalls: Array<{ op: 'signInWithPassword' | 'signUp'; email: string; password: string }> = [];
   /** Devices' clocks: the server's wall clock never lags the fastest honest device. */
   clocks: FakeClock[] = [];
 
@@ -82,16 +94,31 @@ export class FakeServer {
     const srv = this;
     return {
       auth: {
-        async signInWithOtp({ email }) {
-          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: { message: 'invalid', status: 400 } as AuthErrorLike };
-          return { error: null };
-        },
-        async verifyOtp({ email, token }) {
-          if (token !== srv.validCode) return { data: { session: null }, error: { message: 'Token has expired or is invalid', status: 403 } as AuthErrorLike };
+        async signInWithPassword({ email, password }) {
+          srv.authCalls.push({ op: 'signInWithPassword', email, password });
+          const pw = srv.accounts.get(email);
+          if (pw === undefined || pw !== password) {
+            return { data: { session: null, user: null }, error: { message: 'Invalid login credentials', code: 'invalid_credentials', status: 400 } as AuthErrorLike };
+          }
+          if (srv.confirmEmail && !srv.confirmed.has(email)) {
+            return { data: { session: null, user: null }, error: { message: 'Email not confirmed', code: 'email_not_confirmed', status: 400 } as AuthErrorLike };
+          }
           const s: SessionLike = { access_token: 'tok', user: { id: srv.uidFor(email), email } };
           deps.setSession(s);
           queueMicrotask(() => deps.fire('SIGNED_IN', s));
-          return { data: { session: s }, error: null };
+          return { data: { session: s, user: { id: s.user.id } }, error: null };
+        },
+        async signUp({ email, password }) {
+          srv.authCalls.push({ op: 'signUp', email, password });
+          if (srv.accounts.has(email)) return { data: { session: null, user: null }, error: { message: 'User already registered', code: 'user_already_exists', status: 422 } as AuthErrorLike };
+          srv.accounts.set(email, password);
+          const user = { id: srv.uidFor(email) };
+          if (srv.confirmEmail) return { data: { session: null, user }, error: null };
+          srv.confirmed.add(email);
+          const s: SessionLike = { access_token: 'tok', user: { id: user.id, email } };
+          deps.setSession(s);
+          queueMicrotask(() => deps.fire('SIGNED_IN', s));
+          return { data: { session: s, user }, error: null };
         },
         async getSession() {
           return { data: { session: deps.session() } };
@@ -168,8 +195,9 @@ export interface Device {
   online: boolean;
   visible: Array<() => void>;
   onlineHandlers: Array<() => void>;
-  attach(email?: string): Promise<SyncEngine>;
-  signIn(email: string): Promise<void>;
+  attach(): Promise<SyncEngine>;
+  /** Signs in with a sync code (v3). The same code on two devices is the same account. */
+  signIn(code: string): Promise<void>;
 }
 
 export const flush = async (n = 12): Promise<void> => {
@@ -224,12 +252,10 @@ export function makeDevice(server: FakeServer, name: string, startMs: number): D
       });
       return dev.engine;
     },
-    async signIn(email) {
+    async signIn(code) {
       if (!dev.engine) await dev.attach();
-      const r1 = await dev.engine!.requestCode(email);
-      if (!r1.ok) throw new Error('requestCode failed: ' + r1.error);
-      const r2 = await dev.engine!.verifyCode(email, server.validCode);
-      if (!r2.ok) throw new Error('verifyCode failed: ' + r2.error);
+      const r = await dev.engine!.signInWithCode(code);
+      if (!r.ok) throw new Error('signInWithCode failed: ' + r.error);
       await flush();
     },
   };

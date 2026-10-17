@@ -181,10 +181,10 @@ describe('settings validation and presets (TMR-10, TMR-11, GOAL-1)', () => {
     expect(core.timer.getState()).toMatchObject({ phase: 'short', plannedMs: minutes(10) });
   });
 
-  it('defaults: auto-start on, goal 120, Monday week start, volume 0.6, glass chime, light theme', () => {
+  it('defaults: auto-start on, goal 120, Monday week start, volume 0.6, glass chime, sky theme, name Em, cloud friend and stickers on', () => {
     const { core } = fresh();
     expect(core.store.get().settings).toMatchObject({
-      autoStart: true, dailyGoalMin: 120, weekStartsOn: 1, volume: 0.6, chime: 'glass', theme: 'light',
+      autoStart: true, dailyGoalMin: 120, weekStartsOn: 1, volume: 0.6, chime: 'glass', theme: 'sky', displayName: 'Em', mascot: true, stickers: true,
       notifications: true, keepAwake: true, breakPrompts: true, encouragement: true,
     });
   });

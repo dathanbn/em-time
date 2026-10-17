@@ -61,7 +61,7 @@ describe('first run (TSK-1, EDGE-8)', () => {
     expect(d.categories.every((c) => c.updatedAt === 0 && c.createdAt === 0)).toBe(true);
     expect(d.tasks).toEqual([]);
     expect(d.sessions).toEqual([]);
-    expect(d.settings).toMatchObject({ preset: '25/5', focusMin: 25, shortMin: 5, longMin: 15, longEvery: 4, autoStart: true, dailyGoalMin: 120, weekStartsOn: 1, theme: 'light', chime: 'glass', volume: 0.6, updatedAt: 0 });
+    expect(d.settings).toMatchObject({ preset: '25/5', focusMin: 25, shortMin: 5, longMin: 15, longEvery: 4, autoStart: true, dailyGoalMin: 120, weekStartsOn: 1, theme: 'sky', displayName: 'Em', mascot: true, stickers: true, chime: 'glass', volume: 0.6, updatedAt: 0 });
     expect(d.timer).toMatchObject({ phase: 'focus', status: 'idle', remainingMs: 25 * 60_000 });
     expect(d.schemaVersion).toBe(SCHEMA_VERSION);
   });
@@ -152,8 +152,9 @@ describe('unusual storage states', () => {
     const doc = JSON.parse(fixture('backup-bad-records.json')) as AppData;
     const a = createMemoryAdapter({ [STORAGE_KEY]: JSON.stringify(doc) });
     const r = loadData(a, NOW);
-    expect(r.status).toBe('ok');
-    if (r.status !== 'ok') throw new Error('unreachable');
+    // the fixture is a v1 document: it loads as `migrated`, with the same drop accounting as `ok`
+    expect(r.status).toBe('migrated');
+    if (r.status !== 'migrated') throw new Error('unreachable');
     expect(r.dropped).toBe(2);
     expect(r.data.sessions).toHaveLength(7);
   });

@@ -10,7 +10,7 @@ import {
 } from '@core';
 import { at, mkSession, mkTask, mkCategory, CAT1 } from './helpers';
 import { makeCore } from './harness';
-import { completeSession, flush, makeDevice, FakeServer } from './syncHarness';
+import { completeSession, flush, makeDevice, FakeServer, syncEmail } from './syncHarness';
 
 const T0 = at(2026, 10, 14, 10, 0);
 const setup = () => {
@@ -82,7 +82,7 @@ describe('row mapping round trips', () => {
 describe('SYNC-4 / SYNC-5: local writes never wait; push is debounced', () => {
   it('a write while a request is hanging returns immediately and is already stored', async () => {
     const { server, a } = setup();
-    await a.signIn('her@example.com');
+    await a.signIn('her-sync-code');
     let release!: () => void;
     server.hold = new Promise<void>((r) => (release = r));
     const t = a.core.store.addTask({ name: 'written while the network hangs' }); // sync call
@@ -102,7 +102,7 @@ describe('SYNC-4 / SYNC-5: local writes never wait; push is debounced', () => {
 
   it('pushes 2 s after the last write (debounce) and never later than 10 s after the first (max wait)', async () => {
     const { server, a } = setup();
-    await a.signIn('her@example.com');
+    await a.signIn('her-sync-code');
     server.calls.length = 0;
     a.core.store.addTask({ name: 'one' });
     a.clock.advance(1_900);
@@ -130,7 +130,7 @@ describe('SYNC-4 / SYNC-5: local writes never wait; push is debounced', () => {
 
   it('device-only changes (theme, chime) do not trigger a push', async () => {
     const { server, a } = setup();
-    await a.signIn('her@example.com');
+    await a.signIn('her-sync-code');
     await flush();
     server.calls.length = 0;
     a.core.store.updateSettings({ theme: 'dark', chime: 'wood', volume: 0.1 });
@@ -143,7 +143,7 @@ describe('SYNC-4 / SYNC-5: local writes never wait; push is debounced', () => {
 describe('SYNC-6: triggers', () => {
   it('visibility, online and syncNow each run a sync; overlapping triggers coalesce into one follow-up', async () => {
     const { server, a } = setup();
-    await a.signIn('her@example.com');
+    await a.signIn('her-sync-code');
     await flush();
     const selects = () => server.calls.filter((c) => c.op === 'select' && c.table === 'categories').length;
     let before = selects();
@@ -176,7 +176,7 @@ describe('SYNC-6: triggers', () => {
 
   it('offline: status offline and no requests; back online it syncs', async () => {
     const { server, a } = setup();
-    await a.signIn('her@example.com');
+    await a.signIn('her-sync-code');
     a.online = false;
     a.core.store.addTask({ name: 'while offline' });
     server.calls.length = 0;
@@ -203,9 +203,9 @@ describe('SYNC-7 / EDGE-11 / SYNC-14: two devices with disjoint offline history'
     expect(a.core.store.get().sessions).toHaveLength(2);
     expect(b.core.store.get().sessions).toHaveLength(1);
 
-    await a.signIn('her@example.com');
+    await a.signIn('her-sync-code');
     await a.engine!.syncNow();
-    await b.signIn('her@example.com');
+    await b.signIn('her-sync-code');
     await b.engine!.syncNow();
     await a.engine!.syncNow();
 
@@ -225,8 +225,8 @@ describe('SYNC-7 / EDGE-11 / SYNC-14: two devices with disjoint offline history'
   it('repeated syncs and the pull overlap window never duplicate rows', async () => {
     const { server, a, b } = setup();
     completeSession(a);
-    await a.signIn('her@example.com');
-    await b.signIn('her@example.com');
+    await a.signIn('her-sync-code');
+    await b.signIn('her-sync-code');
     for (let i = 0; i < 4; i++) {
       await a.engine!.syncNow();
       await b.engine!.syncNow();
@@ -238,10 +238,10 @@ describe('SYNC-7 / EDGE-11 / SYNC-14: two devices with disjoint offline history'
   it('default categories carry updatedAt 0 and never overwrite a customised one (SYNC-14)', async () => {
     const { a, b } = setup();
     a.core.store.updateCategory(CAT1, { name: 'Lectures' });
-    await a.signIn('her@example.com');
+    await a.signIn('her-sync-code');
     await a.engine!.syncNow();
     expect(b.core.store.get().categories.find((c) => c.id === CAT1)!.updatedAt).toBe(0);
-    await b.signIn('her@example.com');
+    await b.signIn('her-sync-code');
     await b.engine!.syncNow();
     await a.engine!.syncNow();
     expect(a.core.store.get().categories.find((c) => c.id === CAT1)!.name).toBe('Lectures');
@@ -253,8 +253,8 @@ describe('SYNC-8 / SYNC-9: last-write-wins and soft delete', () => {
   it('the later edit wins on both devices regardless of who syncs first', async () => {
     const { a, b } = setup();
     const t = a.core.store.addTask({ name: 'original' });
-    await a.signIn('her@example.com');
-    await b.signIn('her@example.com');
+    await a.signIn('her-sync-code');
+    await b.signIn('her-sync-code');
     await a.engine!.syncNow();
     await b.engine!.syncNow();
     expect(b.core.store.get().tasks.find((x) => x.id === t.id)!.name).toBe('original');
@@ -274,8 +274,8 @@ describe('SYNC-8 / SYNC-9: last-write-wins and soft delete', () => {
   it('a delete propagates as a tombstone and nothing is ever hard deleted', async () => {
     const { server, a, b } = setup();
     const t = a.core.store.addTask({ name: 'to delete' });
-    await a.signIn('her@example.com');
-    await b.signIn('her@example.com');
+    await a.signIn('her-sync-code');
+    await b.signIn('her-sync-code');
     await a.engine!.syncNow();
     await b.engine!.syncNow();
     expect(live(b.core.store.get().tasks)).toHaveLength(1);
@@ -292,13 +292,13 @@ describe('SYNC-8 / SYNC-9: last-write-wins and soft delete', () => {
   it('a stale write cannot overwrite a newer server row (trigger rule)', async () => {
     const { server, a, b } = setup();
     const t = a.core.store.addTask({ name: 'v1' });
-    await a.signIn('her@example.com');
+    await a.signIn('her-sync-code');
     await a.engine!.syncNow();
     a.clock.jump(120_000);
     a.core.store.updateTask(t.id, { name: 'v2' });
     await a.engine!.syncNow();
     // B pushes an older version of the same row
-    await b.signIn('her@example.com');
+    await b.signIn('her-sync-code');
     b.core.store.applyRemote('tasks', [{ ...t }]);
     b.core.store.markAllDirty();
     await b.engine!.syncNow();
@@ -310,12 +310,12 @@ describe('SYNC-8 / SYNC-9: last-write-wins and soft delete', () => {
 describe('SYNC-13: synced and device-only settings', () => {
   it('pushes only synced keys; seeded defaults are never pushed; remote customisation reaches a fresh device', async () => {
     const { server, a, b } = setup();
-    await b.signIn('her@example.com'); // untouched defaults
+    await b.signIn('her-sync-code'); // untouched defaults
     await b.engine!.syncNow();
     expect(server.rows('settings')).toHaveLength(0);
 
     a.core.store.updateSettings({ dailyGoalMin: 45, autoStart: false, theme: 'dark', chime: 'bowl', volume: 0.1, keepAwake: false, notifications: false });
-    await a.signIn('her@example.com');
+    await a.signIn('her-sync-code');
     await a.engine!.syncNow();
     const row = server.rows('settings')[0]!;
     expect(Object.keys(row.data).sort()).toEqual([...SYNCED_SETTINGS_KEYS].sort());
@@ -325,7 +325,7 @@ describe('SYNC-13: synced and device-only settings', () => {
     const s = b.core.store.get().settings;
     expect(s.dailyGoalMin).toBe(45);
     expect(s.autoStart).toBe(false);
-    expect(s.theme).toBe('light'); // device-only keys stay put
+    expect(s.theme).toBe('sky'); // device-only keys stay put (the v2 default is the sky)
     expect(s.chime).toBe('glass');
     expect(s.volume).toBe(0.6);
   });
@@ -337,9 +337,9 @@ describe('SYNC-15: pulled data is quiet', () => {
     for (let i = 0; i < 11; i++) {
       a.core.store.importData({ ...a.core.store.get(), sessions: [...a.core.store.get().sessions, mkSession(at(2026, 9, 1 + i, 9, 0))] }, 'merge');
     }
-    await a.signIn('her@example.com');
+    await a.signIn('her-sync-code');
     await a.engine!.syncNow();
-    await b.signIn('her@example.com');
+    await b.signIn('her-sync-code');
     await b.engine!.syncNow();
     expect(b.core.store.get().sessions).toHaveLength(11);
     expect(b.events).toHaveLength(0);
@@ -359,16 +359,16 @@ describe('EDGE-12 / SYNC-11: account changes and sign-out', () => {
   it('signing in as a different account merges local data into it and discards nothing', async () => {
     const { server, a } = setup();
     a.core.store.addTask({ name: 'mine' });
-    await a.signIn('first@example.com');
+    await a.signIn('first-sync-code');
     await a.engine!.syncNow();
     await a.engine!.signOut();
     expect(a.core.store.get().meta.sync.userId).toBeNull();
     expect(live(a.core.store.get().tasks)).toHaveLength(1);
-    await a.signIn('second@example.com');
+    await a.signIn('second-sync-code');
     await a.engine!.syncNow();
     expect(live(a.core.store.get().tasks)).toHaveLength(1);
-    const first = server.uidFor('first@example.com');
-    const second = server.uidFor('second@example.com');
+    const first = server.uidFor(syncEmail('first-sync-code'));
+    const second = server.uidFor(syncEmail('second-sync-code'));
     expect(first).not.toBe(second);
     expect(server.rows('tasks', first)).toHaveLength(1);
     expect(server.rows('tasks', second)).toHaveLength(1);
@@ -378,7 +378,7 @@ describe('EDGE-12 / SYNC-11: account changes and sign-out', () => {
     const { server, a } = setup();
     a.core.store.addTask({ name: 'stay' });
     completeSession(a);
-    await a.signIn('her@example.com');
+    await a.signIn('her-sync-code');
     await a.engine!.syncNow();
     await a.engine!.signOut();
     server.calls.length = 0;
@@ -395,7 +395,7 @@ describe('EDGE-12 / SYNC-11: account changes and sign-out', () => {
 describe('EDGE-13 / EDGE-14: failures', () => {
   it('an expired token pauses sync, keeps dirty rows and local use; a new sign-in pushes them', async () => {
     const { server, a } = setup();
-    await a.signIn('her@example.com');
+    await a.signIn('her-sync-code');
     server.failNext = { kind: 'auth' };
     a.core.store.addTask({ name: 'queued' });
     await a.engine!.syncNow();
@@ -407,14 +407,14 @@ describe('EDGE-13 / EDGE-14: failures', () => {
     a.clock.advance(30_000);
     await flush();
     expect(server.calls).toHaveLength(0); // paused
-    await a.signIn('her@example.com');
+    await a.signIn('her-sync-code');
     await a.engine!.syncNow();
     expect(server.rows('tasks').map((r) => r.name).sort()).toEqual(['queued', 'still works locally']);
   });
 
   it('server errors back off 5 s, 10 s, 20 s ... capped at 5 min, and recover', async () => {
     const { server, a } = setup();
-    await a.signIn('her@example.com');
+    await a.signIn('her-sync-code');
     server.failAll = true;
     a.core.store.addTask({ name: 'retry me' });
     const delays: number[] = [];
@@ -441,7 +441,7 @@ describe('EDGE-13 / EDGE-14: failures', () => {
 
   it('a network failure reads as offline and retries', async () => {
     const { server, a } = setup();
-    await a.signIn('her@example.com');
+    await a.signIn('her-sync-code');
     a.core.store.addTask({ name: 'x' });
     server.failNext = { kind: 'network' };
     await a.engine!.syncNow();
@@ -456,7 +456,7 @@ describe('EDGE-13 / EDGE-14: failures', () => {
     a.core.store.addTask({ name: 'fine one' });
     a.core.store.addTask({ name: 'REJECT me' });
     a.core.store.addTask({ name: 'fine two' });
-    await a.signIn('her@example.com');
+    await a.signIn('her-sync-code');
     await a.engine!.syncNow();
     expect(server.rows('tasks').map((r) => r.name).sort()).toEqual(['fine one', 'fine two']);
     expect(a.engine!.state().rejected).toBe(1);
@@ -470,7 +470,7 @@ describe('DAT-5: erase the cloud', () => {
     const { server, a } = setup();
     a.core.store.addTask({ name: 'erase me' });
     completeSession(a);
-    await a.signIn('her@example.com');
+    await a.signIn('her-sync-code');
     await a.engine!.syncNow();
     a.online = false;
     expect(await a.engine!.eraseCloud()).toEqual({ ok: false });
@@ -490,10 +490,10 @@ describe('SYNC-10 (client side)', () => {
   it('a pull as another user returns nothing under the fake RLS', async () => {
     const { server, a } = setup();
     a.core.store.addTask({ name: 'private' });
-    await a.signIn('her@example.com');
+    await a.signIn('her-sync-code');
     await a.engine!.syncNow();
     const intruder = makeDevice(server, 'X', T0);
-    await intruder.signIn('intruder@example.com');
+    await intruder.signIn('intruder-sync-code');
     await intruder.engine!.syncNow();
     expect(live(intruder.core.store.get().tasks)).toHaveLength(0);
     expect(intruder.core.store.get().sessions).toHaveLength(0);
