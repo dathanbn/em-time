@@ -246,6 +246,8 @@ export interface SupabaseLike {
     /** `scope: 'local'` (an addition to the contract's no-argument form) keeps other devices signed in. */
     signOut(opts?: { scope: 'local' }): Promise<{ error: AuthErrorLike | null }>;
   };
+  /** v6: calls a Postgres function (the friends api). Errors come back in `error`, as with `from`. */
+  rpc(fn: string, args?: object): Promise<{ data: unknown; error: PostgrestErrorLike | null }>;
   from(table: SyncTable): {
     upsert(
       rows: object[],

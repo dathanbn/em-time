@@ -44,6 +44,9 @@ export { toRow, fromRow } from './sync/rows';
 export { normalizeSyncCode, deriveSyncCredentials, SYNC_CODE_MIN, SYNC_CODE_MAX } from './sync/syncCode';
 export type { SyncCodeError, NormalizedSyncCode, SyncCredentials } from './sync/syncCode';
 export type { SignInWithCodeResult, SignInWithCodeError } from './sync/engine';
+export { FRIENDS_MAX, FRIEND_CODE_LEN, normalizeFriendCode, formatFriendCode } from './sync/friendCode';
+export type { NormalizedFriendCode } from './sync/friendCode';
+export type { FriendsApi, FriendsError, FriendAddError, FriendWeek, FriendsResult } from './sync/engine';
 
 // Additions beyond contract.md section 1 (see HANDOFF.md)
 export { ValidationError } from './store/errors';

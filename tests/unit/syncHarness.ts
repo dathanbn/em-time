@@ -132,6 +132,9 @@ export class FakeServer {
           return { error: null };
         },
       },
+      async rpc() {
+        return { data: null, error: { message: 'rpc is not part of this harness', code: 'PGRST202' } };
+      },
       from(table: SyncTable) {
         return {
           async upsert(rows: object[]) {

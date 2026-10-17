@@ -24,7 +24,9 @@ import type {
   SyncEnv,
   SyncResult,
 } from '../api';
-import type { Category, Session, SyncState, SyncStatus, SyncTable, Task } from '../types';
+import type { Category, ISODay, Session, SyncState, SyncStatus, SyncTable, Task } from '../types';
+import { diffDays, isValidDay } from '../time/calendar';
+import { FRIENDS_MAX, normalizeFriendCode } from './friendCode';
 import { fromRow, toRow } from './rows';
 import { deriveSyncCredentials, SYNC_CODE_EMAIL_DOMAIN, type SyncCodeError } from './syncCode';
 
@@ -35,7 +37,35 @@ export type SignInWithCodeResult = { ok: true } | { ok: false; error: SignInWith
 export const CONFIRM_EMAIL_ON_MESSAGE =
   'Confirm email is still on in Supabase. Turn off "Confirm email" under Authentication, Sign In / Providers, Email, then try again.';
 
+// ---- friends (v6): read-only share codes and a short list of friends' weekly minutes -------------
+
+export type FriendsError = 'signed_out' | 'offline' | 'auth-expired' | 'unknown';
+export type FriendAddError = 'invalid' | 'not_found' | 'own_code' | 'duplicate' | 'limit' | FriendsError;
+/** One friend as the server describes them. `days` maps a study day to focused milliseconds. */
+export interface FriendWeek {
+  code: string;
+  nickname: string | null;
+  displayName: string | null;
+  color: 1 | 2 | 3 | 4 | 5;
+  active: boolean;
+  days: Record<ISODay, number>;
+}
+export type FriendsResult<T> = { ok: true; value: T } | { ok: false; error: FriendsError };
+/** Never throws: every failure is a `{ ok: false, error }`. Codes are the friend code, not the sync code. */
+export interface FriendsApi {
+  getShare(): Promise<FriendsResult<string | null>>;
+  enableShare(): Promise<FriendsResult<string>>;
+  rotateShare(): Promise<FriendsResult<string>>;
+  disableShare(): Promise<FriendsResult<null>>;
+  add(code: string, nickname?: string): Promise<{ ok: true } | { ok: false; error: FriendAddError }>;
+  rename(code: string, nickname: string): Promise<FriendsResult<null>>;
+  remove(code: string): Promise<FriendsResult<null>>;
+  week(from: ISODay, to: ISODay): Promise<FriendsResult<FriendWeek[]>>;
+}
+
 export interface SyncEngine {
+  /** v6: friend codes and friends' weekly minutes. Online only; nothing here touches local data. */
+  friends: FriendsApi;
   state(): SyncState;
   subscribe(fn: (s: SyncState) => void): () => void;
   /** Signs in (or creates the account on first use) with the user's sync code. No email is sent. */
@@ -129,6 +159,60 @@ class PushError extends Error {
 const EPOCH_ISO = new Date(0).toISOString();
 
 const emptyCounts = (): Record<SyncTable, number> => ({ categories: 0, tasks: 0, sessions: 0, settings: 0 });
+
+// ---- friends: validating what the server sends -------------------------------------------------
+
+const BAD = Symbol('bad');
+type Parsed<T> = T | typeof BAD;
+const isRecord = (v: unknown): v is Record<string, unknown> =>
+  typeof v === 'object' && v !== null && !Array.isArray(v);
+/** A stored friend code ('K7QP2MXD'): already normalized, exactly 8 characters of the alphabet. */
+const storedCode = (v: unknown): string | null => {
+  if (typeof v !== 'string') return null;
+  const n = normalizeFriendCode(v);
+  return n.ok && n.code === v ? v : null;
+};
+const clip = (v: unknown, max: number): string | null => {
+  if (typeof v !== 'string') return null;
+  const t = Array.from(v.trim()).slice(0, max).join('');
+  return t.length > 0 ? t : null;
+};
+
+/** Keeps well-formed entries, clamps minutes to >= 0 and drops days outside the asked window. */
+function parseFriendWeek(data: unknown, from: ISODay, to: ISODay): Parsed<FriendWeek[]> {
+  if (!Array.isArray(data)) return BAD;
+  const out: FriendWeek[] = [];
+  const seen = new Set<string>();
+  for (const e of data) {
+    if (!isRecord(e)) continue;
+    const code = storedCode(e.code);
+    const color = e.color;
+    if (code === null || seen.has(code)) continue;
+    if (typeof color !== 'number' || !Number.isInteger(color) || color < 1 || color > 5) continue;
+    if (typeof e.active !== 'boolean') continue;
+    const days: Record<ISODay, number> = {};
+    if (e.active && isRecord(e.days)) {
+      for (const [day, ms] of Object.entries(e.days)) {
+        if (!isValidDay(day) || day < from || day > to) continue;
+        if (typeof ms !== 'number' || !Number.isFinite(ms)) continue;
+        days[day] = Math.max(0, Math.round(ms));
+      }
+    }
+    seen.add(code);
+    out.push({
+      code,
+      nickname: clip(e.nickname, 24),
+      displayName: e.active ? clip(e.displayName, 24) : null,
+      color: color as FriendWeek['color'],
+      active: e.active,
+      days,
+    });
+    if (out.length === FRIENDS_MAX) break;
+  }
+  return out;
+}
+
+const ADD_RESULTS = new Set(['invalid', 'not_found', 'own_code', 'duplicate', 'limit']);
 
 export function createSyncEngine(opts: {
   store: EmStore;
@@ -486,6 +570,70 @@ export function createSyncEngine(opts: {
     }
   })();
 
+  // ---- friends (v6) --------------------------------------------------------------------------
+
+  function friendsError(e: unknown): FriendsError {
+    if (isAuthError(e)) return 'auth-expired';
+    if (isNetworkError(e) || !deps.isOnline()) return 'offline';
+    return 'unknown';
+  }
+
+  /** One rpc call with the engine's own classification. `parse` turns the raw data into the value, or BAD. */
+  async function friendsCall<T>(
+    fn: string,
+    args: object | undefined,
+    parse: (data: unknown) => Parsed<T>,
+  ): Promise<FriendsResult<T>> {
+    if (disposed || !signedIn()) return { ok: false, error: 'signed_out' };
+    if (status === 'auth-expired') return { ok: false, error: 'auth-expired' };
+    if (!deps.isOnline()) return { ok: false, error: 'offline' };
+    try {
+      const { data, error } = await client.rpc(fn, args);
+      if (error) return { ok: false, error: friendsError(error) };
+      const value = parse(data);
+      return value === BAD ? { ok: false, error: 'unknown' } : { ok: true, value };
+    } catch (e) {
+      return { ok: false, error: friendsError(e) };
+    }
+  }
+
+  const parseCode = (d: unknown): Parsed<string> => storedCode(d) ?? BAD;
+  const parseNothing = (): Parsed<null> => null;
+
+  const friends: FriendsApi = {
+    getShare: () => friendsCall('em_share_get', undefined, (d) => (d === null ? null : parseCode(d))),
+    enableShare: () => friendsCall('em_share_enable', undefined, parseCode),
+    rotateShare: () => friendsCall('em_share_rotate', undefined, parseCode),
+    disableShare: () => friendsCall('em_share_disable', undefined, parseNothing),
+    async add(code, nickname) {
+      const n = normalizeFriendCode(code);
+      if (!n.ok) return { ok: false, error: 'invalid' };
+      const r = await friendsCall<string>(
+        'em_friend_add',
+        { p_code: n.code, p_nickname: nickname ?? null },
+        (d) => (d === 'ok' || (typeof d === 'string' && ADD_RESULTS.has(d)) ? d : BAD),
+      );
+      if (!r.ok) return r;
+      return r.value === 'ok' ? { ok: true } : { ok: false, error: r.value as FriendAddError };
+    },
+    async rename(code, nickname) {
+      const n = normalizeFriendCode(code);
+      if (!n.ok) return { ok: false, error: 'unknown' };
+      return friendsCall('em_friend_rename', { p_code: n.code, p_nickname: nickname }, parseNothing);
+    },
+    async remove(code) {
+      const n = normalizeFriendCode(code);
+      if (!n.ok) return { ok: false, error: 'unknown' };
+      return friendsCall('em_friend_remove', { p_code: n.code }, parseNothing);
+    },
+    async week(from, to) {
+      if (!isValidDay(from) || !isValidDay(to) || diffDays(from, to) < 0 || diffDays(from, to) > 13) {
+        return { ok: false, error: 'unknown' };
+      }
+      return friendsCall('em_friends_week', { p_from: from, p_to: to }, (d) => parseFriendWeek(d, from, to));
+    },
+  };
+
   // ---- public API ----------------------------------------------------------------------------
 
   async function removeSession(): Promise<void> {
@@ -506,6 +654,7 @@ export function createSyncEngine(opts: {
   }
 
   return {
+    friends,
     state,
     subscribe(fn) {
       subs.add(fn);
