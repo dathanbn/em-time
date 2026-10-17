@@ -4,6 +4,10 @@ import {
   DEFAULT_CATEGORIES,
   DEFAULT_CHIME,
   DEFAULT_DAILY_GOAL_MIN,
+  DEFAULT_DISPLAY_NAME,
+  DEFAULT_MASCOT,
+  DEFAULT_STICKERS,
+  DEFAULT_THEME,
   DEFAULT_LONG_EVERY,
   DEFAULT_PRESET,
   DEFAULT_VOLUME,
@@ -47,11 +51,14 @@ export function createDefaultSettings(): Settings {
     breakPrompts: true,
     encouragement: true,
     updatedAt: 0,
-    theme: 'light',
+    theme: DEFAULT_THEME,
     chime: DEFAULT_CHIME,
     volume: DEFAULT_VOLUME,
     notifications: true,
     keepAwake: true,
+    displayName: DEFAULT_DISPLAY_NAME,
+    mascot: DEFAULT_MASCOT,
+    stickers: DEFAULT_STICKERS,
   };
 }
 

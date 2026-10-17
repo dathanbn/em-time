@@ -2,7 +2,14 @@ import { CORRUPT_KEY_PREFIX, LIMITS, PRESETS, SYNCED_SETTINGS_KEYS } from '../co
 import { exportData, mergeData } from '../storage/exportImport';
 import { applyRemoteRow } from '../storage/lww';
 import { saveData } from '../storage/persist';
-import { isRecord, validateCategory, validateSession, validateTask } from '../storage/validate';
+import {
+  isRecord,
+  parseRemoteDisplayName,
+  sanitizeDisplayName,
+  validateCategory,
+  validateSession,
+  validateTask,
+} from '../storage/validate';
 import type {
   AppData,
   Category,
@@ -331,8 +338,19 @@ export function createStore(opts: {
       if (patch.weekStartsOn !== undefined && patch.weekStartsOn !== 0 && patch.weekStartsOn !== 1) {
         throw new ValidationError('weekStartsOn', 'limit');
       }
-      if (patch.theme !== undefined && patch.theme !== 'light' && patch.theme !== 'dark') {
+      if (patch.theme !== undefined && !['sky', 'light', 'dark'].includes(patch.theme)) {
         throw new ValidationError('theme', 'required');
+      }
+      for (const k of ['mascot', 'stickers'] as const) {
+        if (patch[k] !== undefined && typeof patch[k] !== 'boolean') throw new ValidationError(k, 'required');
+      }
+      let displayName: string | undefined;
+      if (patch.displayName !== undefined) {
+        if (typeof patch.displayName !== 'string') throw new ValidationError('displayName', 'required');
+        displayName = sanitizeDisplayName(patch.displayName);
+        if (Array.from(displayName).length > LIMITS.displayName[1]) {
+          throw new ValidationError('displayName', 'too-long');
+        }
       }
       if (patch.chime !== undefined && !['glass', 'bowl', 'bell', 'wood', 'none'].includes(patch.chime)) {
         throw new ValidationError('chime', 'required');
@@ -343,6 +361,7 @@ export function createStore(opts: {
 
       const { updatedAt: _ignored, preset, focusMin, shortMin, longMin, ...rest } = patch;
       Object.assign(next, rest);
+      if (displayName !== undefined) next.displayName = displayName;
       if (preset !== undefined && preset !== 'custom') {
         next.preset = preset;
         Object.assign(next, PRESETS[preset]);
@@ -466,7 +485,14 @@ export function createStore(opts: {
           }
           if (row.updatedAt > settings.updatedAt) {
             const merged: Record<string, unknown> = { ...settings };
-            for (const k of SYNCED_SETTINGS_KEYS) if (k in row) merged[k] = row[k];
+            for (const k of SYNCED_SETTINGS_KEYS) {
+              if (!(k in row)) continue;
+              if (k === 'displayName') {
+                // pulled names are applied only if they pass the V2.3 rules; otherwise the local one stays
+                const name = parseRemoteDisplayName(row[k]);
+                if (name !== null) merged[k] = name;
+              } else merged[k] = row[k];
+            }
             merged.updatedAt = row.updatedAt;
             settings = merged as unknown as Settings;
             applied += 1;
