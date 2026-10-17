@@ -63,10 +63,10 @@ describe('deriveSyncCredentials', () => {
     expect(a).toEqual(b);
     expect(a).not.toEqual(c);
   });
-  it('the email is on the emtime.local domain, dots become dashes, and the password is 64 hex characters', async () => {
+  it('the email is on the dathanbn.github.io domain, dots become dashes, and the password is 64 hex characters', async () => {
     const r = await deriveSyncCredentials('a.b.c.d.e.f.g.h');
     if (!r.ok) throw new Error('expected ok');
-    expect(r.credentials.email).toBe('a-b-c-d-e-f-g-h@emtime.local');
+    expect(r.credentials.email).toBe('a-b-c-d-e-f-g-h@dathanbn.github.io');
     expect(r.credentials.password).toMatch(/^[0-9a-f]{64}$/);
   });
   it('returns the validation error and derives nothing for a bad code', async () => {
@@ -156,7 +156,7 @@ describe('the derived email and password never reach AppData or an export', () =
     const stored = JSON.stringify(data);
     for (const [label, blob] of [['AppData', stored], ['export', exported]] as const) {
       expect(blob, `${label}: address`).not.toContain(syncEmail(code));
-      expect(blob, `${label}: domain`).not.toContain('emtime.local');
+      expect(blob, `${label}: domain`).not.toContain('dathanbn.github.io');
       expect(blob, `${label}: password`).not.toContain(syncPassword(code));
       expect(blob, `${label}: code`).not.toContain(normalizeCode(code));
     }

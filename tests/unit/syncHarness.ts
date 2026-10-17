@@ -17,9 +17,9 @@ import { FakeClock, makeCore } from './harness';
 
 type Row = Record<string, any>;
 
-/** QA's own derivation of the v3 credentials from design: email slug (spaces to dashes, dots to dashes) at emtime.local, password SHA-256 of "em-time:v1:" + code. */
+/** QA's own derivation of the v3 credentials from design: email slug (spaces to dashes, dots to dashes) at dathanbn.github.io, password SHA-256 of "em-time:v1:" + code. */
 export const normalizeCode = (raw: string): string => raw.trim().toLowerCase().replace(/\s+/g, '-');
-export const syncEmail = (raw: string): string => `${normalizeCode(raw).replace(/\./g, '-')}@emtime.local`;
+export const syncEmail = (raw: string): string => `${normalizeCode(raw).replace(/\./g, '-')}@dathanbn.github.io`;
 export const syncPassword = (raw: string): string => createHash('sha256').update(`em-time:v1:${normalizeCode(raw)}`).digest('hex');
 
 export class FakeServer {
