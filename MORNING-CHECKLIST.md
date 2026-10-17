@@ -1,7 +1,7 @@
 # Em Time: morning deploy checklist
 
-> **v2 note (Sky diary redesign landed on top of v1).** Two files could not be removed from your folder remotely, so before `git add .` run, in the Em Time folder:
-> `Remove-Item tests\screenshots\*.png` (stale v1 screenshots; the current ones are in `tests\screenshots\v1\` and `v2\`) and `Remove-Item frontend\src\platform\gradient.ts` (replaced by `sky.ts`; the file left behind is an empty stub, harmless if you forget).
+> **v2 note (Sky diary redesign landed on top of v1).** One file set could not be removed from your folder remotely, so before `git add .` run, in the Em Time folder:
+> `Remove-Item tests\screenshots\*.png` (stale v1 screenshots; the current ones are in `tests\screenshots\v1\` and `v2\`). (`frontend\src\platform\gradient.ts`, the old empty stub replaced by `sky.ts`, was deleted from the repo on 2026-10-17.)
 > Supabase: nothing new. Her name now syncs; theme, cloud friend and stickers are per device.
 
 Everything below is one-time. Budget about 25 minutes. Do the parts in order.

@@ -230,3 +230,22 @@ Existing tests changed: `mascot.spec` MASCOT-4 header child count back to 2 with
 **Screenshots** `tests/screenshots/v5-timer-{1280,390}-{midday,dusk,night}.png` (stopwatch running at 12:34, 3 sessions today, a task, Rain chosen) and `v5-break-{390,360}.png` (message line and break idea shown).
 
 **Not verified.** Real Safari and iOS rendering of the backdrop blur and the lock-screen behaviour of the stopwatch (the logic is timestamp based and tested with a jumped clock). The no-backdrop-filter and forced-colors fallbacks are checked as CSS text only, not rendered. The sun, moon or a cloud directly behind a pill (decorative, brighter than any sky colour, like the existing advisory for cards) is not in the contrast sweep: at dusk the setting sun can sit behind the phone pills. The phone `.nav__tabs` computes `backdrop-filter: blur(18px)` although its rule says none; that is v4 behaviour and was left alone.
+
+## 2026-10-17, cleanup (dead code and stale files, branch `cleanup`)
+
+No behaviour change, no schema change, no core semantics change. Started from `npx knip`, then verified every hit with grep over `frontend/`, `tests/`, `scripts/` and config files.
+
+Removed:
+- `frontend/src/platform/gradient.ts` (empty stub left by v2; nothing imports it).
+- `'code-sent'` from `SyncStatus` in `core/types.ts` (the engine stopped emitting it in v3; no UI or test handled it). `docs/contract.md` section 3 still lists it (left alone, it is the frozen contract).
+- `minutesOf` in `charts/Heatmap.tsx` (never called; its `MIN` import went with it), `go()` in `app/router.ts` (never called), `currentSky()` and its write-only `lastState` in `platform/sky.ts`.
+- Eight unused icons in `components/Icon.tsx`: `pencil`, `download`, `upload`, `volume`, `table`, `chart`, `tag`, `folder`.
+- CSS: the `.glass` selector in the two grouped rules at the top of `components.css` (no element ever carried the class) and the `--em-nav-muted` token in both themes (v5 glass labels use `--lg-ink`).
+- `export` keyword dropped (code kept, used only inside its own module): `elapsedMs` (actions.ts), `celebrating`/`waving`/`thumbing` (mascotState.ts), `OTHER_TASKS_ID` (stats/week.ts), `isUuid`, `normalizeDisplayName`, `validateTimer`, `validateMeta` (storage/validate.ts), `createDefaultSyncDeps` (sync/engine.ts), `createFakeClient` and `Op` (sync/fakeSupabase.ts), `phaseEndContent` (notify.ts), `GLASS_INK` (sky.ts), `titleFor` (title.ts), `SHORTCUTS` (Settings.tsx), `Swatch` (Tasks.tsx).
+- `MORNING-CHECKLIST.md`: the v2 note no longer tells you to delete `gradient.ts` (it is gone from the repo).
+
+Kept on purpose (knip reports them, they are live): `public/sw-notify.js` (`importScripts` in `vite.config.ts`, listed in `pwa.spec.ts`), `pwa-assets.config.ts` (`npm run icons`), both fixture generators, `@fontsource-variable/nunito` (imported by URL in `base.css`), `prettier` (`.prettierrc`/`.prettierignore`, run by hand), `glassFor`/`applySky`/`BodyState` (documented in `contract.md`/this file as the sky API), test helper exports in `tests/unit/`. Docs kept: `design-v1.md` (`design.md` says anything it does not restate still holds from v1), `tasks.md` (linked from `spec.md` and `design.md`), `tests/qa-report.md` (linked from README, `spec.md`, `architecture.md`), `MORNING-CHECKLIST.md` (README links it; its Supabase "Confirm email OFF" step and the phone test in Part C are not recorded as done anywhere).
+
+Open candidates, not touched: `greetingFor()` still computes a `sub` line from `messages.json` `sky.subline`, but the Timer renders only `title` (the subline chip left in the Timer simplification). Removing it means editing `greeting.ts`, the `subline` copy and the NAME-6 unit tests, so it needs a decision. `docs/architecture.md` line 69 still lists `gradient.ts` in the file tree.
+
+Checks: typecheck and lint clean, unit 728/728. E2E: timer, stats, settings, sync, pwa, layout 293 passed, 9 skipped; all other specs 596 passed, 45 skipped, 1 failed (`tasks.spec` TSK-6 desktop, an input-value race; passes alone, 8/8 on re-run). Main JS gzip 62,634 to 62,405 B, CSS gzip 12,174 to 12,156 B (`VITE_E2E=1 npm run build`).
