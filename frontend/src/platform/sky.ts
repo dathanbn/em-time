@@ -476,17 +476,11 @@ export function applySky(state: SkyState, root: HTMLElement = document.documentE
 
 let currentMode: () => ThemeId = () => 'sky';
 let onState: ((s: SkyState) => void) | undefined;
-let lastState: SkyState | null = null;
-
-export function currentSky(): SkyState | null {
-  return lastState;
-}
 
 /** Recompute and write right now (after a theme change, a visibility change or a resize). */
 export function refreshSky(): void {
   const mode = currentMode();
   const state = skyFor(mode, new Date());
-  lastState = state;
   document.documentElement.dataset.themeMode = mode;
   applySky(state);
   onState?.(state);

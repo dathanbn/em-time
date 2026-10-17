@@ -1,5 +1,5 @@
 import { useRef, useState } from 'preact/hooks';
-import { formatDuration, MIN, parseDay, type HeatmapCell } from '@core';
+import { formatDuration, parseDay, type HeatmapCell } from '@core';
 import { ChartTable, Empty } from './ChartTable';
 import { anchorOf, hideTip, showTip } from './Tooltip';
 import { useSize } from './useSize';
@@ -197,5 +197,3 @@ export function heatSummary(cells: HeatmapCell[]): {
   }
   return { active, totalMs, best };
 }
-
-export const minutesOf = (ms: number): number => Math.round(ms / MIN);
