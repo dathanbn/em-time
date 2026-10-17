@@ -85,7 +85,7 @@ test.describe('focus sounds: Timer chip and picker', () => {
     await expect(chip(page)).toContainText('Sounds');
     const box = (await chip(page).boundingBox())!;
     expect(box.height).toBeGreaterThanOrEqual(44);
-    // right-aligned in the header row, inside the viewport, no horizontal scroll
+    // inside the viewport (v5: under the play controls on phone, in the Focus tools card on desktop), no horizontal scroll
     const vw = page.viewportSize()!.width;
     expect(box.x + box.width).toBeLessThanOrEqual(vw);
     expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
