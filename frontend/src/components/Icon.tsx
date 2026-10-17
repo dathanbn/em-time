@@ -5,6 +5,8 @@ const PATHS = {
   stats: '<path d="M5 20v-8M12 20V5M19 20v-11"/>',
   settings:
     '<path d="M4 7h8M17 7h3M4 17h3M12 17h8"/><circle cx="14.5" cy="7" r="2.5"/><circle cx="9.5" cy="17" r="2.5"/>',
+  stopwatch:
+    '<circle cx="12" cy="14" r="7.5"/><path d="M12 14l3-3.5M10 2.8h4M12 2.8v3.7M18.4 7.3l1.4-1.4"/>',
   play: '<path d="M8 5.5v13l11-6.5z" fill="currentColor"/>',
   pause:
     '<rect x="6.5" y="5" width="3.6" height="14" rx="1" fill="currentColor"/><rect x="13.9" y="5" width="3.6" height="14" rx="1" fill="currentColor"/>',

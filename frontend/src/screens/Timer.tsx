@@ -22,6 +22,7 @@ import { useNarrow } from '../app/useNarrow';
 import { GoalRing } from '../charts/GoalRing';
 import { Companion } from '../components/Companion';
 import { Icon } from '../components/Icon';
+import { StopwatchCard, StopwatchPill } from '../components/Stopwatch';
 import { Dialog } from '../components/Dialog';
 import { IconButton, Segmented } from '../components/ui';
 import { reducedMotion } from '../platform/env';
@@ -403,7 +404,7 @@ function Greeting() {
   );
 }
 
-/** Header pill: shows the chosen sound and opens the Focus sounds sheet. */
+/** Shows the chosen sound and opens the Focus sounds sheet. Sits under the controls on phone, in the Focus tools card on desktop. */
 function NoiseChip({ onOpen }: { onOpen: () => void }) {
   const { noiseOn, noise } = data.value.settings;
   const [label, emoji] = noiseInfo(noise);
@@ -451,7 +452,6 @@ export function Timer() {
       <div class="timerpage__main">
         <header class="thead">
           <Greeting />
-          <NoiseChip onOpen={() => setSounds(true)} />
           {narrow ? <Companion size={68} mirror class="thead__mascot" /> : null}
         </header>
         <Segmented
@@ -475,6 +475,12 @@ export function Timer() {
           </div>
           <div class="controlswrap">
             <Controls />
+            {narrow ? (
+              <div class="toolrow">
+                <NoiseChip onOpen={() => setSounds(true)} />
+                <StopwatchPill />
+              </div>
+            ) : null}
             <div class="timerpage__aux">
               <p class={`msg${msg ? ' msgchip' : ''}`} data-testid="message-line">
                 {msg}
@@ -499,6 +505,13 @@ export function Timer() {
         <div class="card side">
           <UpNext />
         </div>
+        {narrow ? null : (
+          <div class="card side" data-testid="focus-tools">
+            <h3 class="side__h">Focus tools</h3>
+            <NoiseChip onOpen={() => setSounds(true)} />
+            <StopwatchCard />
+          </div>
+        )}
       </aside>
       {picker ? <TaskPicker onClose={() => setPicker(false)} /> : null}
       {sounds && NoisePicker ? <NoisePicker onClose={() => setSounds(false)} /> : null}

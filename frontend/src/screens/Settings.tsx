@@ -22,6 +22,7 @@ import { ExportReminder, exportBackup } from '../app/Banners';
 import { breakPrompt, message } from '../app/actions';
 import { loadNoiseUi, noiseUi } from '../app/noise';
 import { core, data } from '../app/coreBridge';
+import { clearStopwatch } from '../app/stopwatch';
 import { useNarrow } from '../app/useNarrow';
 import { Companion } from '../components/Companion';
 import { Dialog } from '../components/Dialog';
@@ -536,6 +537,7 @@ function EraseFlow() {
         await eng?.signOut();
         core.store.eraseAll(Date.now());
         clearUiMemory();
+        clearStopwatch();
       }
       core.timer.adopt(core.store.get().timer);
       message.value = null;

@@ -93,11 +93,11 @@
   left: 50%;
   width: min(calc(100vw - 2 * var(--em-gutter)), 460px);
   transform: translateX(-50%);
-  margin-top: 14px;
+  margin-top: 8px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 14px;
+  gap: 10px;
 }
 .timerpage__mid {
   padding-bottom: 140px;
@@ -112,7 +112,7 @@
 .thead {
   align-self: stretch;
   display: flex;
-  align-items: flex-start;
+  align-items: center; /* phone: the greeting sits on the cloud's centre line */
   justify-content: space-between;
   gap: 12px;
   min-height: 72px;
@@ -132,52 +132,43 @@
   overflow-wrap: anywhere;
 }
 .thead__mascot {
-  margin-top: -6px;
-}
-/* Phone: greeting and cloud on the first row, the sounds chip right-aligned on its own row. */
-@media (max-width: 899px) {
-  .thead {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: start;
-    row-gap: 4px;
-  }
-  .thead .nchip {
-    grid-row: 2;
-    grid-column: 1 / -1;
-    justify-self: end;
-  }
+  flex: none;
 }
 .modes {
   max-width: 460px;
 }
-/* Mode pill: compact frosted glass with a soft light-blue active option. */
+/* Mode pill: clear liquid glass (lg tokens) with a lighter bead under the active option. */
 .modes {
   width: min(100%, 340px);
   align-self: center;
   padding: 3px;
-  background: var(--em-glass);
-  border: 1px solid var(--em-glass-border);
-  -webkit-backdrop-filter: blur(var(--em-blur)) saturate(140%);
-  backdrop-filter: blur(var(--em-blur)) saturate(140%);
-  box-shadow: var(--em-shadow-sm);
+  background: var(--lg-base);
+  border: 1px solid var(--lg-rim);
+  -webkit-backdrop-filter: var(--lg-blur);
+  backdrop-filter: var(--lg-blur);
+  box-shadow: var(--lg-depth);
 }
 .modes .seg__opt {
   min-height: 44px;
   padding: 0 10px;
+  color: var(--lg-ink);
+}
+.modes .seg__opt:hover:not([aria-checked='true']) {
+  background: var(--lg-hover);
+  color: var(--lg-ink);
 }
 .modes .seg__opt[aria-checked='true'] {
-  background: var(--em-accent);
-  box-shadow:
-    inset 0 0 0 1.5px var(--em-accent-text),
-    0 2px 8px var(--em-ring-glow);
+  background: var(--lg-bead);
+  color: var(--lg-ink);
+  box-shadow: var(--lg-bead-depth);
 }
 .modes .seg__opt[aria-checked='true']:focus-visible {
   box-shadow:
     0 0 0 4px var(--em-focus-halo),
-    inset 0 0 0 1.5px var(--em-accent-text);
+    var(--lg-bead-depth);
 }
-/* Focus sounds chip: frosted like the mode pill, 44px tall. The equalizer shows only while playing. */
+/* Focus sounds chip: clear glass on the sky (phone), a quiet pill inside the Focus tools card
+   (desktop). 44px tall. The equalizer shows only while playing. */
 .nchip {
   display: inline-flex;
   align-items: center;
@@ -188,12 +179,12 @@
   min-height: 44px;
   padding: 0 14px;
   border-radius: var(--em-radius-pill);
-  background: var(--em-glass);
-  border: 1px solid var(--em-glass-border);
-  -webkit-backdrop-filter: blur(var(--em-blur)) saturate(140%);
-  backdrop-filter: blur(var(--em-blur)) saturate(140%);
-  box-shadow: var(--em-shadow-sm);
-  color: var(--em-ink);
+  background: var(--lg-base);
+  border: 1px solid var(--lg-rim);
+  -webkit-backdrop-filter: var(--lg-blur);
+  backdrop-filter: var(--lg-blur);
+  box-shadow: var(--lg-depth);
+  color: var(--lg-ink);
   font-size: var(--em-fs-sm);
   font-weight: var(--em-fw-semibold);
   white-space: nowrap;
@@ -201,6 +192,14 @@
     background-color var(--em-dur-base) var(--em-ease-standard),
     color var(--em-dur-base) var(--em-ease-standard),
     transform 240ms var(--em-ease-spring);
+}
+.nchip:hover {
+  background: linear-gradient(var(--lg-hover), var(--lg-hover)), var(--lg-base);
+}
+.nchip:focus-visible {
+  box-shadow:
+    0 0 0 4px var(--em-focus-halo),
+    var(--lg-depth);
 }
 .nchip:active {
   transform: scale(0.96);
@@ -210,14 +209,14 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.nchip[data-state='off'] {
-  color: var(--em-ink-2);
-}
 .nchip:not([data-state='off']) {
-  background: var(--em-accent-soft);
+  background: var(--lg-bead), var(--lg-base);
+  box-shadow: var(--lg-bead-depth);
+}
+.nchip:not([data-state='off']):focus-visible {
   box-shadow:
-    inset 0 0 0 1.5px var(--em-accent-text),
-    var(--em-shadow-sm);
+    0 0 0 4px var(--em-focus-halo),
+    var(--lg-bead-depth);
 }
 .nchip[data-state='loading'] > :first-child {
   animation: nchip-pulse 1s ease-in-out infinite alternate;
@@ -226,7 +225,7 @@
   color: var(--em-danger);
   box-shadow:
     inset 0 0 0 1.5px var(--em-danger),
-    var(--em-shadow-sm);
+    var(--lg-bead-depth);
 }
 .eq {
   display: none;
@@ -241,7 +240,7 @@
   width: 3px;
   height: 100%;
   border-radius: 2px;
-  background: var(--em-accent-text);
+  background: currentColor;
   transform-origin: bottom;
   animation: eq-bar 700ms ease-in-out infinite alternate;
 }
@@ -283,6 +282,129 @@
   .eq i:nth-child(3) {
     transform: scaleY(0.75);
   }
+}
+
+/* Phone: Sounds and the stopwatch pill share one centred row under the play controls. */
+.toolrow {
+  --lg-ink: var(--lg-ink-low);
+  --lg-base: var(--lg-fill), var(--lg-scrim-low);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  max-width: 100%;
+  margin-top: 10px;
+}
+.toolrow .nchip {
+  flex: 0 1 auto;
+  min-width: 46px;
+  min-height: 46px;
+}
+.swpill {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  gap: 2px;
+  padding: 0 0 0 14px;
+  border-radius: var(--em-radius-pill);
+  background: var(--lg-base);
+  border: 1px solid var(--lg-rim);
+  -webkit-backdrop-filter: var(--lg-blur);
+  backdrop-filter: var(--lg-blur);
+  box-shadow: var(--lg-depth);
+  color: var(--lg-ink);
+}
+.swpill[data-state='running'] {
+  background: var(--lg-bead), var(--lg-base);
+  box-shadow: var(--lg-bead-depth);
+}
+.swpill__glyph {
+  flex: none;
+  margin-right: 6px;
+}
+.swpill__time {
+  min-width: 3.2ch;
+  margin-right: 2px;
+  font-size: var(--em-fs-sm);
+  font-weight: var(--em-fw-heavy);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.swpill .iconbtn {
+  color: var(--lg-ink);
+}
+.swpill .iconbtn:hover:not(:disabled) {
+  background: var(--lg-hover);
+  color: var(--lg-ink);
+}
+.swpill .iconbtn[aria-disabled='true'] {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* Desktop: the Focus tools card holds the Sounds chip and the labelled stopwatch. */
+.side .nchip {
+  align-self: flex-start;
+  background: var(--em-surface-sunk);
+  border-color: var(--em-border);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: none;
+  color: var(--em-ink);
+}
+.side .nchip:hover {
+  background: var(--em-accent-soft);
+}
+.side .nchip[data-state='off'] {
+  color: var(--em-ink-2);
+}
+.side .nchip:not([data-state='off']) {
+  background: var(--em-accent-soft);
+  box-shadow: inset 0 0 0 1.5px var(--em-accent-text);
+}
+.side .nchip[data-state='error'] {
+  color: var(--em-danger);
+  box-shadow: inset 0 0 0 1.5px var(--em-danger);
+}
+.side .nchip:focus-visible {
+  box-shadow: 0 0 0 4px var(--em-focus-halo);
+}
+.swatch {
+  display: grid;
+  gap: 4px;
+  padding-top: 12px;
+  border-top: 1px solid var(--em-border);
+}
+.swatch__label {
+  color: var(--em-ink-2);
+  font-size: var(--em-fs-sm);
+  font-weight: var(--em-fw-semibold);
+}
+.swatch__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+.swatch__time {
+  font-size: var(--em-fs-xl);
+  line-height: 36px;
+  font-weight: var(--em-fw-heavy);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.swatch__btns {
+  display: flex;
+  gap: 8px;
+}
+.swatch .btn {
+  padding: 0 16px;
+}
+.swatch .btn[aria-disabled='true'] {
+  color: var(--em-ink-3);
+  opacity: 0.6;
+  pointer-events: none;
 }
 
 /* Focus sound tiles (picker sheet) */
@@ -1509,6 +1631,9 @@ input[type='range'] {
 
 @media (max-width: 899px) {
   /* Phone: the break idea stays on one line so the card keeps a fixed height in its reserved band. */
+  .promptcard {
+    padding: 12px 16px; /* the Sounds row took the room above the tab bar */
+  }
   .promptcard__text {
     overflow: hidden;
     text-overflow: ellipsis;
