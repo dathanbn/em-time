@@ -327,3 +327,122 @@ Lines 1 to 4 contain `{sessions}` (MSG-2).
 - `sessions-250`: Two hundred fifty sessions. Look how far you've come.
 - `streak-7`: Seven days in a row. A full week of showing up.
 - `streak-30`: Thirty days straight. That's a real rhythm.
+
+---
+
+## v2 Sky diary
+
+Dathan reviewed v1 and found it too clean and minimal for a gift. v2 keeps every v1 behavior (timer engine, tasks, stats math, sync, export and import, shortcuts, PWA, reduced motion, 44 px targets, AA contrast) and replaces the look with "Sky diary": the whole screen is a sky that follows the real clock, a cloud friend mascot reacts to her sessions, personalized emoji stickers drift by and burst on completion, and greetings use her name. Visual spec: `design.md` (v2; v1 kept as `design-v1.md`). Interfaces: `contract.md` "v2 changes". Work orders: `tasks.md` v2 sections.
+
+Testing convention for this section: "clock at HH:MM" means Playwright `page.clock.install({ time })` (or an injected `now` in unit tests) set to that local time today in `TZ=America/Los_Angeles`, theme "Follow the sky" unless stated. Keyframe ids and times: `latenight` 02:30, `dawn` 06:00, `morning` 08:30, `midday` 12:30, `afternoon` 16:00, `dusk` 18:30, `evening` 20:30, `night` 23:00.
+
+### v2.1 Sky (SKY)
+
+- **SKY-1** Every route renders the scene `[data-testid="sky"]`: fixed, covering the viewport, behind all content, `aria-hidden="true"`, `pointer-events: none`, no focusable descendants.
+- **SKY-2** With the clock at each keyframe time, the computed `--sky-top`, `--sky-mid` and `--sky-horizon` on `<html>` equal the design.md 2.1 hex values (case-insensitive) and `html[data-sky-phase]` equals the keyframe id.
+- **SKY-3** With the clock at 02:00: `data-sky-phase="latenight"`, `data-theme="dark"`, the moon is visible, the sun is not rendered, `--sky-star-opacity` is at least 0.9, and the greeting contains "night" (case-insensitive) and none of the banned words (NAME-5).
+- **SKY-4** With the clock at 12:30: `data-sky-phase="midday"`, `data-theme="light"`, the sun is visible and its center x is between 45% and 55% of the viewport width, `--sky-star-opacity` is 0, the moon is not rendered.
+- **SKY-5** Blending: at 10:30 (halfway between `morning` and `midday`), `--sky-top` equals the OKLab midpoint of `#6EB8F2` and `#4FA8EE` within 1 per RGB channel. The value at 10:10 differs from 10:00.
+- **SKY-6** Cadence: with the clock running, the sky custom properties are rewritten once per minute (at most 2 writes in any 60 s window without a resize or visibility change), and once immediately when the page becomes visible.
+- **SKY-7** Arcs: the sun is rendered only from 05:30 to 19:30 and the moon only from 19:00 to 06:30. At 06:00 the sun's center is within 15% of the viewport height from the top of the back hill. Neither body's bounding box enters the header band (viewport y 0 to 232 px at 1280, 0 to 132 px at 390) at any keyframe.
+- **SKY-8** Scene elements: exactly 3 cloud elements; star count 28 at 1280 and 16 at 390; hills present.
+- **SKY-9** Polarity: `data-theme="light"` from 05:15 through 16:59 and `"dark"` from 17:00 through 05:14 (checked at 05:14, 05:15, 16:59, 17:00).
+- **SKY-10** Contrast, proven by a unit sweep: for each of the 1,440 minutes and for both fixed modes, every text and indicator pair in design.md section 12 passes (normal text 4.5:1, large on-sky text 3:1, focus indicator 3:1, heat-3 on chart cards 3:1, heat-1 on chart cards 2:1) when composited over the blended sky top, mid, horizon and both hill colors.
+- **SKY-11** Contrast, in the browser: axe reports zero serious or critical violations on every screen at both widths with the clock at all 8 keyframe times plus 05:15, 16:59, 17:00 and 17:19.
+- **SKY-12** Only large text sits on the sky: every visible text node whose nearest non-transparent background is the scene has a computed font size of at least 24 px, or at least 18.66 px at weight 700 or more.
+- **SKY-13** Focus is visible at every keyframe: a focused button, link, input and segmented option each show the two-tone indicator (`outline` in `--em-focus-ring` plus the `--em-focus-halo` shadow).
+- **SKY-14** `<meta name="theme-color">` equals the current `--sky-top` and updates with it.
+- **SKY-15** Performance: no `<canvas>` element is attached to the document; with the page hidden, every running animation inside the scene, mascot and sticker layers reports `playState === 'paused'` and no sticker is added; on return they resume. Initial JS stays under 60 KB gzipped and CSS under 16 KB gzipped.
+- **SKY-16** Reduced motion: with `prefers-reduced-motion: reduce`, no animation runs in the scene, mascot or sticker layers (`getAnimations()` empty or all finished), and no drifting sticker is ever added.
+
+### v2.2 Cloud friend (MASCOT)
+
+- **MASCOT-1** The mascot `[data-testid="mascot"]` is present on Timer at 390 and 1280 by default, is `aria-hidden`, has `pointer-events: none`, and its bounding box intersects no button, link, input or select on any screen at either width.
+- **MASCOT-2** `data-state` is `idle` with the focus phase idle, `focusing` while a focus phase runs, `break` during short and long breaks, `celebrate` within 100 ms after a focus session completes (for 1.6 s, then `break`), and `wave` for 1.8 s after a streak milestone (streak-7, streak-30) and on the first app open of each study day.
+- **MASCOT-3** Night alert: whenever `data-theme="dark"`, `data-accessory="headlamp"`; in `idle` and `focusing` the eye shapes are the wide-open variant. The mascot SVG contains no closed-eye state other than the blink, and no "Zzz" or sleep asset.
+- **MASCOT-4** With "Cloud friend" off: no mascot element on any screen, and the Timer header at 390 lets the greeting use the full width (no empty slot).
+- **MASCOT-5** With reduced motion, `data-state` still changes as in MASCOT-2 but no animation runs on the mascot.
+- **MASCOT-6** The mascot carries no information: the accessibility tree of each screen is identical with the mascot on and off.
+
+### v2.3 Stickers (STICKER)
+
+- **STICKER-1** `frontend/src/data/stickers.json` validates against the contract schema; each emoji is a single grapheme (`Intl.Segmenter`); default pools and weights equal design.md 4.2.
+- **STICKER-2** Drift cadence (fake clock, seeded random): the first sticker appears 20 to 40 s after load, then one every 45 to 90 s; never more than 3 on screen at 1280 or 2 at 390; while a focus phase runs, at most 1 on screen and spawns 120 to 240 s apart. Each drifting sticker is removed from the DOM when it finishes crossing.
+- **STICKER-3** No repeats: across 500 seeded picks, no pick equals the previous pick, and no pick equals a sticker currently on screen.
+- **STICKER-4** Weights: over 10,000 seeded picks at 23:00, the night pool's share is within 3 percentage points of its weight fraction; the makeup pool's share is at most 8% at every phase; the dawn pool is never picked at 12:30.
+- **STICKER-5** Burst: when a focus session completes with the page visible, 12 sticker elements (9 at 390; 18 and 14 when a milestone fires too) appear in `[data-testid="sticker-burst"]` within 100 ms, centered on the ring bubble, and all are removed within 1.6 s. No burst after Skip, a break ending, a late catch-up completion, or a pulled sync session.
+- **STICKER-6** With "Sky stickers" off: no drifting stickers and no burst; a milestone shows the v1 confetti (MIL-2) instead.
+- **STICKER-7** While the page is hidden no sticker spawns, and no burst plays on return.
+- **STICKER-8** Emoji the device cannot render are dropped at startup and never shown as a box (manual check on Windows 10 for 🫧 and ❤️‍🩹).
+
+### v2.4 Display name and greeting (NAME)
+
+- **NAME-1** Default `displayName` is "Em". With the clock at 14:00, the greeting `[data-testid="greeting"]` is one of the afternoon lines and ends with ", Em".
+- **NAME-2** Changing "Your name" in Settings to "Emily" updates the greeting without reload, persists after reload, and (signed in) syncs to another device.
+- **NAME-3** The name is trimmed and at most 24 characters (input `maxlength` 24; `updateSettings` throws `ValidationError('displayName', 'too-long')` beyond that). A blank name gives the greeting without a name and without a trailing comma ("Good afternoon").
+- **NAME-4** The name is rendered as text: "<b>x</b>" displays literally.
+- **NAME-5** Greeting rules (unit test over every line and every subline template): the window follows the real clock (dawn 04:30 to 06:59, morning 07:00 to 11:59, afternoon 12:00 to 16:59, evening 17:00 to 20:59, night 21:00 to 04:29); the variant is stable within a study day and window; every night line contains "night"; no greeting or subline contains late, sleep, sleepy, tired, bed, bedtime or exhausted (whole words, case-insensitive).
+- **NAME-6** Subline `[data-testid="greeting-sub"]` follows design.md section 9 in priority order, e.g. with 3 sessions today and a 6-day streak it reads "3 sessions today · 6-day streak"; with 0 sessions and a 1-day streak "Keep your streak going"; with a 9-day streak and sessions today "9-day streak, look at you".
+
+### v2.5 Theme setting (THEME)
+
+- **THEME-1** Settings "Theme" offers "Follow the sky" (default), "Always light", "Always dark" (`data-testid` `settings-theme-sky`, `settings-theme-light`, `settings-theme-dark`; the group keeps `settings-theme`). The choice persists per device.
+- **THEME-2** "Always light" with the clock at 02:00: `data-sky-phase="midday"`, `data-theme="light"`, the sun at its apex, while the greeting still uses a night line.
+- **THEME-3** "Always dark" with the clock at 12:30: `data-sky-phase="night"`, `data-theme="dark"`, moon and stars visible, mascot `data-accessory="headlamp"`, while the greeting uses an afternoon line.
+- **THEME-4** Migration: a v1 document or v1 export with `theme: 'light'` loads with `theme: 'sky'`; `'dark'` stays `'dark'`; a missing or unknown value becomes `'sky'`. Missing `displayName`, `mascot`, `stickers` get "Em", true, true. Nothing else changes.
+- **THEME-5** Sync: `displayName` is in the pushed `settings.data`; `theme`, `mascot` and `stickers` never are.
+- **THEME-6** "Cloud friend" and "Sky stickers" switches exist (`settings-mascot`, `settings-stickers`), default on, persist per device, and take effect without reload.
+
+### v2.6 Changed v1 criteria
+
+- **UI-1** replaced by THEME-1 to THEME-3 (Light/Dark toggle removed; light is no longer the default, the sky is).
+- **UI-2** replaced by SKY-2 to SKY-9 (the four-period gradient is gone).
+- **UI-3** unchanged, plus: the Play button is visible without scrolling at 390x844.
+- **A11Y-1** now reads: all text meets WCAG 2.1 AA at every minute of the day in every theme mode (SKY-10, SKY-11); only large text sits directly on the sky (SKY-12).
+- **A11Y-2** focus indicator is the two-tone ring (SKY-13).
+- **TMR-16** the breathing glow is a halo around the glass ring bubble; reduced-motion rule unchanged.
+- **MIL-2** with stickers on, the milestone celebration is the larger sticker burst (STICKER-5) plus the mascot (`celebrate`, then `wave` for streak milestones); with stickers off, v1 confetti. Reduced motion: message only, as v1, plus the static 3-sticker flash.
+- **MIL-3** also clears any sticker burst the moment a focus phase starts.
+- **SYNC-13** synced settings add `displayName`; device-only add `mascot`, `stickers` (theme stays device-only).
+- **EDGE-8** copy unchanged; Tasks empty and Stats first run also show the decorative mascot.
+- **PWA-1** icon is the cloud friend on light blue; manifest `theme_color` `#4FA8EE`, `background_color` `#8CC8F5`, description "Your little sky for focus."
+- Section 5 "automatic dark mode" is now in scope as the sky; following the OS color scheme is still out of scope.
+
+### v2.7 Decisions made for Dathan
+
+**FLAGGED: none of these were in Dathan's brief. Each can be reversed.**
+
+- **D-53 Keyframe times** are fixed clock times (02:30, 06:00, 08:30, 12:30, 16:00, 18:30, 20:30, 23:00) and the sun is up 05:30 to 19:30, moon 19:00 to 06:30, all year. No location and no seasonal sunrise: it never asks for location and always looks the same at the same hour.
+- **D-54 Cards and charts snap** between a light and a dark set at 05:15 and 17:00 (600 ms cross-fade) while the sky itself blends continuously. Blending the cards too would push chart colors off their validated values and break contrast in twilight.
+- **D-55 Dusk is dark.** From 17:00 the UI is in its dark set; the sky still glows pink and orange at the horizon until about 19:00.
+- **D-56 Text on the open sky is limited to large headings at the top of the screen** (greeting, page titles, brand), with the ink flipping between navy and white per minute. Everything else sits on glass or cards: Stats section titles become glass labels and their subtitles move inside the cards.
+- **D-57 Fixed modes:** "Always light" shows the 12:30 sky and "Always dark" the 23:00 sky. Greetings and sticker choices still follow the real clock.
+- **D-58 v1 "light" becomes "Follow the sky"** on upgrade (schema version 2), because light was v1's default rather than a choice. "dark" is kept.
+- **D-59 Name syncs, visuals do not:** `displayName` syncs across devices; theme, cloud friend and stickers are per device (e.g. a calmer phone at work).
+- **D-60 Blank name allowed** (greeting without a name); maximum 24 characters.
+- **D-61 The cloud friend also waves hello** on the first open of each study day, not only on streak milestones.
+- **D-62 Night accessory:** always a headlamp at night; the star companion joins only on breaks and celebrations, to keep focus time calm.
+- **D-63 Sticker cadence:** first after 20 to 40 s, then every 45 to 90 s, max 3 (2 on phone); during focus every 2 to 4 minutes and max 1.
+- **D-64 Burst on every completed focus session,** not only milestones (bigger on milestones). It replaces confetti while stickers are on.
+- **D-65 The moon shows the real lunar phase.**
+- **D-66 Nunito Variable replaces Inter;** timer digits at weight 800 (Nunito figures are equal width, so no jitter).
+- **D-67 iOS status bar is `black-translucent`** so the sky runs under the clock and battery icons. Trade-off: the white status icons are low contrast on the pale dawn sky.
+- **D-68 Unsupported emoji are dropped** on each device by a startup check (Windows 10 cannot draw 🫧 or ❤️‍🩹).
+- **D-69 Empty-state copy unchanged;** the mascot is added as decoration.
+- **D-70 CSS budget raised** from 12 KB to 16 KB gzipped for the scene, mascot and glass styles.
+- **D-71 Greeting lines and the subline rules** in design.md section 9 and Appendix D were written by the architect, including "Night shift focus" and "look at you".
+- **D-72 Selected states get an inset blue edge** (light blue fills alone are too faint on glass to meet the 3:1 non-text rule).
+- **D-73 Phone mascot sits in the header** beside the greeting rather than near the controls, so it can never cover Play.
+- **D-74 Sticker weights** in design.md 4.2 (night pool heaviest from 20:30 to 02:30, girly pop heaviest in the afternoon, makeup about 3 to 7%).
+
+## Appendix D: Sky greetings (use verbatim, `messages.json` key `sky.greetings`)
+
+`{name}` is the display name; with a blank name, drop `", {name}"`.
+
+- dawn (04:30 to 06:59): "Good morning, {name}" · "Sunrise session, {name}" · "Early bird, {name}"
+- morning (07:00 to 11:59): "Good morning, {name}" · "Morning, {name}" · "Hello sunshine, {name}"
+- afternoon (12:00 to 16:59): "Good afternoon, {name}" · "Afternoon, {name}" · "Hi there, {name}"
+- evening (17:00 to 20:59): "Good evening, {name}" · "Evening, {name}" · "Golden hour, {name}"
+- night (21:00 to 04:29): "Night owl session, {name}" · "Night shift focus, {name}" · "Starry night session, {name}"
+
+Subline templates (`sky.subline`): "{n}-day streak, look at you" · "{k} sessions today · {n}-day streak" · "{k} session today · {n}-day streak" · "{k} sessions today" · "{k} session today" · "Keep your {n}-day streak going" · "Keep your streak going" · "Ready when you are".

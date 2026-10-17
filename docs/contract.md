@@ -949,3 +949,218 @@ revoke all on public.categories, public.tasks, public.sessions, public.settings 
 revoke delete, truncate on public.categories, public.tasks, public.sessions, public.settings from authenticated;
 grant select, insert, update on public.categories, public.tasks, public.sessions, public.settings to authenticated;
 ```
+
+---
+
+## v2 changes (Sky diary)
+
+Additive unless marked "changed". Everything above stays binding. Core stays framework-free: the sky, mascot, stickers and greeting are frontend modules; core only gains settings fields, defaults, validation, migration and the synced-key change. No new core selector is needed (the greeting uses `select.today()` and `select.streak()`; sticker and sky phases come from the clock in the frontend).
+
+### V2.1 Types (`core/types.ts`, changed)
+
+```ts
+export type ThemeId = 'sky' | 'light' | 'dark';   // changed: 'sky' added and is the default
+
+export interface Settings {
+  // synced keys (SYNCED_SETTINGS_KEYS)
+  preset: PresetId;
+  focusMin: number;
+  shortMin: number;
+  longMin: number;
+  longEvery: number;
+  autoStart: boolean;
+  dailyGoalMin: number;
+  weekStartsOn: 0 | 1;
+  breakPrompts: boolean;
+  encouragement: boolean;
+  displayName: string;        // NEW, synced. Trimmed, 0..24 chars, '' = no name. Default 'Em'.
+  updatedAt: number;
+  // device-only keys
+  theme: ThemeId;             // default 'sky'
+  chime: ChimeId;
+  volume: number;
+  notifications: boolean;
+  keepAwake: boolean;
+  mascot: boolean;            // NEW, device-only. Default true.
+  stickers: boolean;          // NEW, device-only. Default true.
+}
+```
+
+Migration-safe defaults are mandatory: every path that produces a `Settings` (`createDefaultSettings`, `validateSettings` on load, import, `mergeData`, sync `fromRow` merge) must fill a missing or invalid `displayName`, `mascot`, `stickers` or `theme` with its default and must never drop the document or the record because of them. `Copy` is unchanged; the frontend reads the new `sky` copy straight from `messages.json`.
+
+### V2.2 Constants (`core/constants.ts`, changed)
+
+```ts
+export const SCHEMA_VERSION = 2;                       // changed from 1
+export const DEFAULT_THEME = 'sky';                    // new
+export const DEFAULT_DISPLAY_NAME = 'Em';              // new
+export const DEFAULT_MASCOT = true;                    // new
+export const DEFAULT_STICKERS = true;                  // new
+// LIMITS gains:  displayName: [0, 24]
+// SYNCED_SETTINGS_KEYS gains 'displayName' (appended last)
+// DAY_PERIODS and GRADIENT_BLEND_MIN: deprecated, kept exported and unchanged, no longer used by the UI
+```
+
+### V2.3 Migration, validation, store
+
+- `MIGRATIONS[1]` (v1 to v2): if `settings.theme === 'light'` set it to `'sky'`; leave `'dark'`; add `displayName: 'Em'`, `mascot: true`, `stickers: true` when absent. Does not touch `settings.updatedAt` (device-only and seeded values must not win sync). Applies to stored data and to imported v1 backup files alike.
+- `validateSettings`: `theme` is kept if it is one of `'sky' | 'light' | 'dark'`, else `'sky'`; `displayName` must be a string, is trimmed, control characters (U+0000 to U+001F, U+007F) removed, and if longer than 24 code points after trimming it is cut to 24; non-string becomes `'Em'`; `mascot` and `stickers` are booleans, else `true`.
+- `store.updateSettings`: `displayName` is trimmed; more than 24 code points throws `ValidationError('displayName', 'too-long')`; `''` is valid. A `displayName` change counts as a synced change (bumps `settings.updatedAt`, marks settings dirty). `theme` accepts the three values, else `ValidationError('theme', 'required')`. `mascot` and `stickers` must be booleans.
+- Export files carry `schemaVersion: 2`. A v1 app opening v2 data goes read-only (`read-only-newer`), which is expected.
+
+### V2.4 Sync
+
+- `toRow('settings')` now includes `displayName` in `data`. No SQL change (`settings.data` is `jsonb`).
+- `fromRow('settings')` and `applyRemote`: a pulled `displayName` is applied only if it is a string that passes the V2.3 rules; otherwise the key is ignored (local value kept). A row from a v1 device (no `displayName`) keeps the local value, as with any missing key today.
+- `theme`, `mascot`, `stickers` must never appear in pushed `settings.data` (QA asserts).
+
+### V2.5 `frontend/src/data/stickers.json`
+
+```json
+{
+  "version": 1,
+  "pools": {
+    "medicine": ["🚑", "🩺", "🧬", "🩹", "🏥", "🧠", "💊", "🧪", "📚", "✏️", "🦴", "❤️‍🩹"],
+    "girly":    ["🎀", "🌸", "💖", "✨", "💫", "🫧", "🦋", "🍓", "🧸", "🌈"],
+    "makeup":   ["💄", "💅"],
+    "night":    ["🌙", "⭐", "🦉", "🚑", "🔦"],
+    "dawn":     ["☕", "🌅", "🐦"],
+    "study":    ["📖", "🧠", "🧪", "✏️"]
+  },
+  "weights": {
+    "latenight": { "medicine": 4, "girly": 2, "makeup": 0.5, "night": 5, "dawn": 0, "study": 2 },
+    "dawn":      { "medicine": 2, "girly": 3, "makeup": 0.5, "night": 1, "dawn": 5, "study": 2 },
+    "morning":   { "medicine": 3, "girly": 3, "makeup": 0.5, "night": 0, "dawn": 2, "study": 4 },
+    "midday":    { "medicine": 3, "girly": 4, "makeup": 1,   "night": 0, "dawn": 0, "study": 4 },
+    "afternoon": { "medicine": 3, "girly": 4, "makeup": 1,   "night": 0, "dawn": 0, "study": 3 },
+    "dusk":      { "medicine": 3, "girly": 4, "makeup": 1,   "night": 2, "dawn": 0, "study": 2 },
+    "evening":   { "medicine": 3, "girly": 3, "makeup": 1,   "night": 3, "dawn": 0, "study": 2 },
+    "night":     { "medicine": 4, "girly": 2, "makeup": 0.5, "night": 5, "dawn": 0, "study": 2 }
+  }
+}
+```
+
+Schema rules: `version` is 1. `pools` maps a pool id (`[a-z][a-z0-9-]*`) to an array of strings, each exactly one grapheme; a pool may be empty. `weights` has exactly the 8 `SkyPhaseId` keys; each maps pool ids to numbers of at least 0. A pool missing from a phase's weights has weight 0 there; a weight naming an unknown pool is ignored. If every eligible pool is empty or zero for a phase, no sticker spawns in that phase (no error). Dathan may add pools and emoji freely. Frontend type:
+
+```ts
+export interface StickerData {
+  version: 1;
+  pools: Record<string, string[]>;
+  weights: Record<SkyPhaseId, Record<string, number>>;
+}
+```
+
+### V2.6 `messages.json` addition (frontend only)
+
+```ts
+sky: {
+  greetings: Record<'dawn' | 'morning' | 'afternoon' | 'evening' | 'night', string[]>; // 3 each, spec Appendix D
+  subline: {
+    streakStar: string;        // "{n}-day streak, look at you"
+    todayAndStreak: string;    // "{k} sessions today · {n}-day streak"
+    todayAndStreakOne: string; // "{k} session today · {n}-day streak"
+    today: string;             // "{k} sessions today"
+    todayOne: string;          // "{k} session today"
+    keepStreak: string;        // "Keep your {n}-day streak going"
+    keepStreakOne: string;     // "Keep your streak going"
+    ready: string;             // "Ready when you are"
+  };
+}
+```
+
+### V2.7 Frontend modules (not core; pure parts are Node-testable)
+
+`frontend/src/platform/sky.ts` replaces `platform/gradient.ts` (delete it; keep its OKLab helpers here).
+
+```ts
+export type SkyPhaseId = 'latenight' | 'dawn' | 'morning' | 'midday' | 'afternoon' | 'dusk' | 'evening' | 'night';
+export type Polarity = 'light' | 'dark';
+
+export interface SkyKeyframe {
+  id: SkyPhaseId; atMin: number;                // minutes since local midnight
+  top: string; mid: string; horizon: string; hillBack: string; hillFront: string;
+  sunInner: string; sunOuter: string; sunGlow: string; moonGlow: string;   // glow as rgba()
+  cloudFill: string; cloudOpacity: number; starOpacity: number;
+}
+export const SKY_KEYFRAMES: readonly SkyKeyframe[];       // design.md 2.1, exact values
+export const POLARITY_FLIP_MIN: { toLight: 315; toDark: 1020 };   // 05:15, 17:00
+export const SKY_INK: { dark: '#10263F'; light: '#FFFFFF' };
+
+export interface BodyState { visible: boolean; p: number; opacity: number }
+export interface SkyState {
+  minutes: number;                // the (possibly pinned) clock used
+  phase: SkyPhaseId;              // nearest keyframe by circular minute distance (ties go to the later)
+  polarity: Polarity;
+  top: string; mid: string; horizon: string; hillBack: string; hillFront: string;
+  sunInner: string; sunOuter: string; sunGlow: string; moonGlow: string;
+  cloudFill: string; cloudOpacity: number; starOpacity: number;
+  ink: string;                    // SKY_INK value with the higher min contrast vs top and mid
+  sun: BodyState; moon: BodyState & { illumination: number; waxing: boolean };
+}
+
+export function skyAt(minutes: number, date?: Date): SkyState;           // pure; date only for moon phase
+export function skyFor(mode: ThemeId, now: Date): SkyState;              // 'light' pins 750 (12:30), 'dark' pins 1380 (23:00)
+export function polarityAt(minutes: number): Polarity;                   // pure
+export function arcPosition(p: number, vw: number, vh: number, kind: 'sun' | 'moon'): { x: number; y: number; size: number };
+export function moonPhase(now: Date): { illumination: number; waxing: boolean };
+export function contrastRatio(fg: string, bg: string): number;           // WCAG, exported for tests
+export function composite(rgba: string, under: string): string;         // alpha over opaque hex
+export function applySky(state: SkyState, root?: HTMLElement): void;    // writes V2.8 properties and html attributes, theme-color meta
+export function startSky(getMode: () => ThemeId): () => void;           // minute-aligned tick, visibility and resize; returns stop
+```
+
+`frontend/src/app/greeting.ts` (pure):
+
+```ts
+export type GreetingWindow = 'dawn' | 'morning' | 'afternoon' | 'evening' | 'night';
+export function greetingWindow(minutes: number): GreetingWindow;
+export function greetingFor(input: {
+  now: Date; studyDay: ISODay; name: string; todaySessions: number; streak: StreakInfo;
+  copy: Messages['sky'];
+}): { title: string; sub: string };
+```
+
+`frontend/src/platform/stickers.ts`:
+
+```ts
+export function validateStickerData(x: unknown): StickerData;           // throws on schema violation (QA uses it on the shipped file)
+export function createStickerPicker(data: StickerData, rng: () => number): {
+  pick(phase: SkyPhaseId, exclude?: readonly string[]): string | null;  // no back-to-back repeats, avoids `exclude`
+  supported(filter: (emoji: string) => boolean): void;                  // drop emoji the device cannot draw
+};
+export function startStickers(opts: { layer: HTMLElement; picker: ReturnType<typeof createStickerPicker>;
+  isFocusRunning: () => boolean; isNarrow: () => boolean; rng: () => number }): () => void;
+export function burst(opts: { origin: DOMRect; count: number; picker: ReturnType<typeof createStickerPicker>; phase: SkyPhaseId }): void;
+```
+
+Timing constants live in `stickers.ts`: `FIRST_SPAWN_S = [20, 40]`, `SPAWN_S = [45, 90]`, `FOCUS_SPAWN_S = [120, 240]`, `MAX_ON_SCREEN = { wide: 3, narrow: 2, focus: 1 }`, `DRIFT_S = [30, 42]`, `BURST = { wide: 12, narrow: 9, milestoneWide: 18, milestoneNarrow: 14, ms: 1400 }`.
+
+Randomness: one injectable `rng`. Builds with `VITE_E2E=1` and a URL with `?e2e&seed=<int>` use mulberry32 seeded with that integer; otherwise `Math.random`.
+
+Device-only UI memory: localStorage key `em-time:ui`, JSON `{ lastWaveDay: ISODay | null }`, read and written with try/catch, never exported, synced or required. Erase all data removes it.
+
+### V2.8 CSS custom properties (additions and changed values)
+
+Set by `applySky` on `<html>` once per minute (scene):
+
+| Group | Names |
+|---|---|
+| Sky | `--sky-top`, `--sky-mid`, `--sky-horizon`, `--sky-hill-back`, `--sky-hill-front`, `--sky-ink` |
+| Bodies | `--sky-sun-inner`, `--sky-sun-outer`, `--sky-sun-glow`, `--sky-moon-glow`, `--sky-sun-x`, `--sky-sun-y`, `--sky-sun-size`, `--sky-sun-opacity`, `--sky-moon-x`, `--sky-moon-y`, `--sky-moon-size`, `--sky-moon-opacity` |
+| Weather | `--sky-cloud-fill`, `--sky-cloud-opacity`, `--sky-star-opacity` |
+
+Static in `tokens.css`, per polarity (`:root` light, `:root[data-theme="dark"]` dark):
+
+| Group | Names |
+|---|---|
+| Glass (new) | `--em-glass`, `--em-glass-border`, `--em-surface-solid`, `--em-blur`, `--em-focus-halo` |
+| Mascot (new) | `--mascot-fill`, `--mascot-line`, `--mascot-shade`, `--mascot-ink`, `--mascot-blush` |
+| Type (new) | `--em-fs-greet`, `--em-fs-section`, `--em-fw-heavy` |
+| Sticker (new) | `--sticker-size` (30px, 26px below 900 px) |
+| Changed values | `--em-bg` = `var(--sky-mid)`; `--em-bg-grad-top` = `var(--sky-top)`; `--em-bg-grad-bottom` = `var(--sky-horizon)`; `--em-surface`, `--em-surface-sunk`, `--em-danger-soft`, `--em-scrim` become rgba; `--em-accent-text` light `#1A62A0`; `--em-focus-ring` light `#0F416F`; `--em-ink-3` dark `#8C9DB4`; `--em-ring-track`, `--em-ring-fill`, `--em-ring-glow`; `--em-font-sans` Nunito; type scale, weights, radii, shadows per design.md 2.6, 5, 6 |
+
+`<html>` attributes: `data-theme` (`light` or `dark`, now the polarity), `data-sky-phase` (`SkyPhaseId`), `data-theme-mode` (`sky`, `light`, `dark`), `data-hidden` (present while the page is hidden).
+
+### V2.9 DOM hooks (additions)
+
+`data-testid`: `sky`, `sky-sun`, `sky-moon`, `sky-stars`, `sky-cloud` (3 elements), `sky-hills`, `sticker-layer`, `sticker` (with `data-emoji`), `sticker-burst`, `mascot` (with `data-state`: `idle | focusing | break | celebrate | wave`, and `data-accessory`: `none | headlamp`), `greeting`, `greeting-sub`, `settings-theme-sky`, `settings-theme-light`, `settings-theme-dark`, `settings-display-name`, `settings-mascot`, `settings-stickers`. `settings-theme` stays on the group.

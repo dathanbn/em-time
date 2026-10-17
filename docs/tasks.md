@@ -115,3 +115,69 @@ Order recap: Logic step 0 (Gate A) -> Logic, Frontend, QA in parallel -> Gate B 
 **Responsible acceptance criteria:** verifies all of them. Every ID in spec.md section 3 and section 4 appears in the report.
 
 **Done means:** suites run with one command (`npm test`) locally and in CI; every criterion has a PASS, a FAIL with owner and repro, or MANUAL with a checklist item; screenshots exist for every listed screen, state, theme and viewport; the report contains no unverified PASS.
+
+---
+
+# v2 Sky diary work orders
+
+Read first: `spec.md` section "v2 Sky diary" (criteria SKY, MASCOT, STICKER, NAME, THEME and the changed v1 criteria), `design.md` (v2, read in full; `design-v1.md` for anything v2 says is unchanged), `contract.md` "v2 changes". Rules from v1 still apply: no em-dashes in copy, copy used verbatim, each agent edits only its own folders, requests go to `HANDOFF.md`. The "no emojis" rule now has one exception: sticker emoji, which live only in `stickers.json` and only render in the sticker layers.
+
+Order: Logic V1 and V2 (small, first) -> Frontend in parallel from the start against the stub (the new settings fields can be faked until Logic lands) -> QA writes unit tests in parallel -> QA full run -> Opus review -> deploy.
+
+## 4. Logic agent (v2)
+
+**Owns:** `frontend/src/core/` only. Small job; post "Core v2 ready" to `HANDOFF.md` when done.
+
+1. **V1 Types and constants:** apply contract V2.1 and V2.2 exactly (`ThemeId` with `'sky'`, `displayName`, `mascot`, `stickers`, `SCHEMA_VERSION = 2`, new defaults, `LIMITS.displayName`, `'displayName'` appended to `SYNCED_SETTINGS_KEYS`; `DAY_PERIODS` and `GRADIENT_BLEND_MIN` stay). Update the contract-verbatim copies and the byte check.
+2. **V2 Defaults, validation, store:** `createDefaultSettings` returns `theme: 'sky'`, `displayName: 'Em'`, `mascot: true`, `stickers: true` (seeded `updatedAt` stays 0). `validateSettings` and `store.updateSettings` per contract V2.3.
+3. **V3 Migration:** `MIGRATIONS[1]` per V2.3. Load, import (`parseImport`) and `mergeData` all pass through it.
+4. **V4 Sync:** `toRow` and `fromRow` for `displayName` with the V2.3 validation on pull; device-only keys never pushed.
+5. **V5 Stub and fixtures:** `createStubCore` uses the new defaults; regenerate `stub-data.json` if it stores settings.
+6. **V6 Tests (colocated):** migration v1 `light` to `sky`, `dark` kept, missing and junk values defaulted, v1 export file imports; `displayName` trim, control-character strip, 24 limit, blank allowed, `too-long` error; `displayName` change bumps `settings.updatedAt` and marks settings dirty, `theme`/`mascot`/`stickers` changes do not; push payload contains `displayName` and never `theme`, `mascot`, `stickers`; pulled invalid `displayName` ignored; v1-shaped remote row keeps the local name. Keep coverage at 90% or more.
+
+**Responsible:** THEME-4, THEME-5, NAME-3 (store rule), SYNC-13 (amended).
+
+## 5. Frontend agent (v2)
+
+**Owns:** everything under `frontend/` except `core/`. Build in this order; keep the app shippable after each step (v1 tests should keep passing until step 11 changes the theme control).
+
+1. **Fonts and tokens:** swap Inter for `@fontsource-variable/nunito` (latin only) and remove the Inter package; rewrite `tokens.css` per design.md 2.6, 5 and 6 (both polarity blocks, new glass, mascot, type and focus-halo tokens, contract V2.8). Global focus indicator (two-tone). `@supports not (backdrop-filter)` fallbacks.
+2. **`platform/sky.ts` (pure first):** `SKY_KEYFRAMES` from design.md 2.1 exactly, OKLab blending, `polarityAt`, sky ink selection, `arcPosition`, `moonPhase`, `contrastRatio`, `composite`, then `applySky` and `startSky` (minute-aligned tick, visibility, resize debounce, theme-color meta, `data-theme`, `data-sky-phase`, `data-theme-mode`, `data-hidden`). Delete `platform/gradient.ts` and switch `App.tsx` from the theme effect to `startSky(() => settings.theme)`. Update the inline shell script in `index.html` (design.md 13).
+3. **Scene component** (`components/Scene.tsx`): gradient, stars SVG (seeded positions), sun with rays and glow, moon with phase, 3 clouds, hills SVG, sticker layer; fixed, `aria-hidden`, `contain: strict`; all motion in CSS; paused under `html[data-hidden]`; static under reduced motion; hidden under `forced-colors`.
+4. **Glass primitives:** restyle Button, IconButton, Segmented (inset selected edge), Switch, Stepper, Select, inputs, checkbox, chips, Dialog, Sheet, Banner, Tooltip, update pill per design.md 6 and 7.5. Card component with `--em-surface` and a `solid` variant.
+5. **Nav:** desktop transparent row with the brand on sky and the glass tab pill; phone floating glass bar; content bottom padding; safe areas; focus-running muted labels in ink-2. Replace the ring glyph with the 28 px cloud glyph.
+6. **Mascot** (`components/Mascot.tsx`): SVG per design.md 3.1, states and priority (3.2), headlamp and star companion by polarity, mirroring by placement, `wave` on streak milestones and on first open per study day (`em-time:ui`), the "Cloud friend" setting, reduced motion. `data-state` and `data-accessory` attributes.
+7. **Stickers:** `data/stickers.json` (contract V2.5 verbatim), `platform/stickers.ts` (validator, picker with no repeats and `exclude`, emoji support filter, spawner with cadence and caps, burst), seeded `rng` for `?e2e&seed=`. Hook the burst into `initPhaseEffects` (visible page, focus completions only, milestone size); keep v1 confetti for stickers off; clear any burst when focus starts (MIL-3).
+8. **Greeting:** `messages.json` `sky` block (spec Appendix D verbatim), `app/greeting.ts` (windows, stable variant hash on study day plus window, blank-name rule, subline priority), rendered with `textContent`.
+9. **Timer screen rebuild** (design.md 7.1): header band with greeting, subline chip and phone mascot; glass segmented; glass ring bubble `min(380px, 46vh)` desktop and `min(76vw, 296px)` phone with halo glow; desktop mascot slot; controls; message chip; break card; Today card and Up next (desktop) and Today strip (phone). Play visible without scrolling at 390x844 and 1024x768.
+10. **Tasks and Stats:** cards over the sky, title rows with the 56 px or 48 px mascot, Stats section titles as glass labels with subtitles moved into the cards, chart cards on `--em-surface-solid`, chart shape changes and 600 ms fill cross-fade (design.md 8), empty-state mascots (design.md 9).
+11. **Settings:** "You" card with "Your name"; Appearance with the 3-way Theme (segmented at 900 px and up, radio list below), "Cloud friend" and "Sky stickers" switches, helper copy (design.md 7.4); all new `data-testid`s (contract V2.9). Erase all data also clears `em-time:ui`.
+12. **PWA and icon:** new `icon.svg` (design.md 13), regenerate rasters, manifest colors and description, `black-translucent` status bar with safe-area padding.
+13. **Performance pass:** confirm no canvas attached, animations only on transform and opacity, hidden-tab pause, at most 3 clouds and the sticker caps, sky writes once per minute; bundle under 60 KB gzipped JS and 16 KB gzipped CSS (update `scripts/check-size.mjs` to also check CSS).
+14. **Self-check** before handing to QA: open the app with the clock pinned to each keyframe (`?e2e&seed=1` on an e2e build plus devtools time override, or Playwright) at 390 and 1280 and compare against design.md; post a `HANDOFF.md` note with anything you could not match.
+
+**Responsible:** SKY-1 to SKY-9, SKY-12 to SKY-16, MASCOT-1 to MASCOT-6, STICKER-1 to STICKER-8, NAME-1 to NAME-6 (UI), THEME-1 to THEME-3, THEME-6, and the changed UI-1, UI-2, UI-3, A11Y-1, A11Y-2, TMR-16, MIL-2, MIL-3, EDGE-8, PWA-1.
+
+**Done means:** every screen matches design.md v2 at 390 and 1280 at day and night; no hard-coded colors outside `tokens.css` and `SKY_KEYFRAMES`; the per-minute contrast sweep (QA) is green against your `SKY_KEYFRAMES` and token values; all v1 criteria still pass; typecheck and lint clean.
+
+## 6. QA agent (v2)
+
+**Owns:** `tests/`, `vitest.config.ts`, `playwright.config.ts`. Write unit tests from the contract and design tables, not from the implementation.
+
+1. **Unit, sky (`tests/unit/sky.test.ts`):** `SKY_KEYFRAMES` equal design.md 2.1 hex for hex; `skyAt` at each keyframe minute returns exact stops; 10:30 is the OKLab midpoint (SKY-5); continuity: no channel jumps by more than 3 between adjacent minutes, including across midnight; `polarityAt` at 05:14, 05:15, 16:59, 17:00; `phase` nearest-keyframe rule (02:00 latenight, 12:00 midday); sun visible only 05:30 to 19:30, moon only 19:00 to 06:30; arc x at 12:30 is 0.5 W; bodies stay out of the header band for every minute at 1280x900, 1024x768 and 390x844; `skyFor('light')` and `skyFor('dark')` pin 12:30 and 23:00.
+2. **Unit, contrast sweep (`tests/unit/sky-contrast.test.ts`, SKY-10):** reimplement compositing independently (do not import `composite` from the app). For each of the 1,440 minutes and for both pinned modes: composite `--em-glass`, `--em-surface`, `--em-surface-solid` of the minute's polarity over each of top, mid, horizon, hill back, hill front; assert ink, ink-2, ink-3, accent-text, danger on cards at 4.5; ink, ink-2, accent-text on glass at 4.5; on-accent on accent at 4.5; the sky ink against top and mid at 3; the focus indicator (better of ring and halo) against each sky color at 3 and the ring against cards at 3; heat-3 on the solid card at 3 and heat-1 at 2. Read token values from `tokens.css` and `SKY_KEYFRAMES` so drift is caught. Print the worst minute per pair; it should match design.md section 12.
+3. **Unit, greeting (NAME-5, NAME-6):** window boundaries (04:29 night, 04:30 dawn, 06:59, 07:00, 11:59, 12:00, 16:59, 17:00, 20:59, 21:00); variant stable within a study day and window across 100 calls, varies across days; blank name drops the comma; every night line contains "night"; banned words absent from every line and every subline template; each subline rule with exact strings including singular "1 session today".
+4. **Unit, stickers (STICKER-1, 3, 4):** the shipped `stickers.json` passes `validateStickerData` and your own schema check; graphemes via `Intl.Segmenter`; seeded 500-pick no-repeat and `exclude`; 10,000-pick distribution checks; empty pools and unknown pool ids handled; all-zero phase returns null.
+5. **Unit, core v2 (THEME-4, THEME-5, NAME-3):** migration and validation cases from the logic list, written independently; v1 fixtures `backup-valid.json` and `backup-v0.json` import cleanly with the new defaults; sync push payload keys with the fake Supabase.
+6. **E2E, behavior (desktop-chromium and mobile-chromium):** SKY-1 to SKY-9 and SKY-13, SKY-14 with `page.clock.install`; SKY-6 by counting style writes over 3 fast-forwarded minutes; SKY-15 hidden-tab pause (emulate `visibilityState` hidden, then check `getAnimations()` play states and that the sticker count does not grow over 5 fast-forwarded minutes) and no `<canvas>` attached; SKY-16 and MASCOT-5 with `reducedMotion: 'reduce'`; MASCOT-1 bounding-box intersection against every interactive element on every screen at both widths; MASCOT-2 state transitions (start, finish a 1-minute focus session with the clock, break, milestone via a seeded fixture at 9 sessions and at a 6-day streak, first open of a study day); MASCOT-3 at 02:00 and with "Always dark"; MASCOT-4 and MASCOT-6 (compare `page.accessibility.snapshot()` with mascot on and off); STICKER-2, STICKER-5 to STICKER-7 with `?e2e&seed=1` and the fake clock; NAME-1 to NAME-4; THEME-1 to THEME-3, THEME-6; SKY-12 text-on-sky probe (walk visible text nodes, find the nearest ancestor with a non-transparent background or backdrop filter, flag nodes whose nearest is the scene and whose size is below the large-text rule); UI-3 Play above the fold at 390x844 and 1024x768. Re-run the full v1 e2e suite; update only the theme toggle steps (UI-1 replaced) and confetti expectations (MIL-2 amended).
+7. **E2E, accessibility (SKY-11):** `@axe-core/playwright` on Timer (idle and running), Tasks, Stats (seeded), Settings, at 390 and 1280, with the clock at 02:30, 06:00, 08:30, 12:30, 16:00, 18:30, 20:30, 23:00, 05:15, 16:59, 17:00, 17:19. Zero serious or critical. Record "incomplete" contrast nodes in the report as covered by the sweep.
+8. **Screenshots** (`tests/screenshots/v2/`, `animations: 'disabled'`, `?e2e&seed=1`, name `{screen}-{state}-{width}-{keyframe}.png`):
+   - Timer (running focus, with a task, 3 sessions today, 6-day streak) and Stats (seeded `backup-valid.json`) at 4 keyframes x 2 widths: `dawn` 06:00, `midday` 12:30, `dusk` 18:30, `night` 23:00 (16 images).
+   - Timer idle, Timer break with prompt, Timer celebrate (captured 300 ms after completion, animations disabled), Tasks, Tasks empty, Stats empty, Settings (full page), the discard dialog and the task picker, at `midday` 12:30 and `night` 23:00, both widths.
+   - Settings with "Always light" at 02:00 and "Always dark" at 12:30, both widths.
+   - Timer with mascot and stickers off at 12:30, both widths.
+   - Move the v1 screenshots to `tests/screenshots/v1/` so the two sets can be compared.
+9. **Manual checklist additions:** iPhone home-screen app at night: sky under the status bar, headlamp mascot, night greeting; leave the app open across 17:00 and watch the cards flip smoothly; Windows laptop: emoji rendering (🫧, ❤️‍🩹 dropped, nothing shows as a box); feel check by Dathan at morning, afternoon and night: does it feel friendly and alive without distracting during focus.
+10. **Report:** add every SKY, MASCOT, STICKER, NAME and THEME ID and each changed v1 ID to `tests/qa-report.md` with method, result, evidence and owner if failing; include the sweep's worst-minute table, bundle sizes (JS and CSS), and the screenshot index.
+
+**Responsible:** verifies all v2 criteria and re-verifies all v1 criteria.
