@@ -3,6 +3,7 @@ import './styles/tokens.css';
 import './styles/base.css';
 import './styles/components.css';
 import './styles/screens.css';
+import './styles/scene.css';
 import { createEmCore, type Copy, type EmCore } from '@core';
 import messages from './data/messages.json';
 import { App } from './app/App';
@@ -10,7 +11,9 @@ import { initPhaseEffects } from './app/actions';
 import { initBridge, core, timerState } from './app/coreBridge';
 import { initRouter } from './app/router';
 import { initPwa } from './platform/pwa';
-import { startGradient } from './platform/gradient';
+import { startSky } from './platform/sky';
+import { skyPolarity } from './app/skySignals';
+import { initFirstOpenWave } from './app/mascotState';
 import { initShortcuts } from './platform/shortcuts';
 import { initTitle } from './platform/title';
 import { initWakeLock } from './platform/wakeLock';
@@ -32,12 +35,16 @@ async function boot(): Promise<void> {
   }
 
   initBridge(em);
-  document.documentElement.dataset.theme = em.store.get().settings.theme;
   initRouter();
   initPhaseEffects();
   initTitle();
   initWakeLock();
-  startGradient(() => core.store.get().settings.theme);
+  startSky(
+    () => core.store.get().settings.theme,
+    (s) => {
+      skyPolarity.value = s.polarity;
+    },
+  );
   initShortcuts({
     toggle: togglePlay,
     skip,
@@ -52,6 +59,7 @@ async function boot(): Promise<void> {
 
   const root = document.getElementById('app')!;
   render(<App />, root);
+  initFirstOpenWave();
   document.getElementById('boot')?.remove();
 }
 
