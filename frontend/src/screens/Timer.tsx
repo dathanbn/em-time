@@ -1,7 +1,7 @@
 import { effect } from '@preact/signals';
 import type { ComponentChildren } from 'preact';
 import { useLayoutEffect, useRef, useState } from 'preact/hooks';
-import { MIN, ValidationError, formatClock, formatDuration, type Phase } from '@core';
+import { MIN, ValidationError, formatClock, formatDuration, todayKey, type Phase } from '@core';
 import {
   PHASE_LABEL,
   breakPrompt,
@@ -14,15 +14,18 @@ import {
   togglePlay,
 } from '../app/actions';
 import { clockTick, core, data, timerState, track } from '../app/coreBridge';
+import { greetingFor, type SkyCopy } from '../app/greeting';
 import { currentTask, openTasks, plural } from '../app/selectors';
+import { useNarrow } from '../app/useNarrow';
 import { GoalRing } from '../charts/GoalRing';
+import { Companion } from '../components/Companion';
 import { Icon } from '../components/Icon';
 import { Dialog } from '../components/Dialog';
 import { IconButton, Segmented } from '../components/ui';
 import { reducedMotion } from '../platform/env';
 import { Confetti } from '../components/Confetti';
 
-const RING_R = 177;
+const RING_R = 175;
 const MODE_OPTIONS = [
   { value: 'focus' as Phase, label: 'Focus', testid: 'mode-focus' },
   { value: 'short' as Phase, label: 'Short break', testid: 'mode-short' },
@@ -84,10 +87,10 @@ function TimerFace({ children }: { children?: ComponentChildren }) {
         if (t >= 1) tween = null;
       }
       draw(p);
-      const sv = svg.current;
-      if (sv) {
-        sv.classList.toggle('ring--breathing', s.status === 'running' && s.phase === 'focus');
-        sv.classList.toggle('ring--paused', s.status === 'paused');
+      const bubble = svg.current?.parentElement;
+      if (bubble) {
+        bubble.classList.toggle('bubble--breathing', s.status === 'running' && s.phase === 'focus');
+        bubble.classList.toggle('bubble--paused', s.status === 'paused');
       }
     };
 
@@ -137,7 +140,7 @@ function TimerFace({ children }: { children?: ComponentChildren }) {
         focusable="false"
         data-testid="timer-ring"
       >
-        <circle cx="180" cy="180" r={RING_R} fill="none" stroke="var(--em-ring-track)" stroke-width="6" />
+        <circle cx="180" cy="180" r={RING_R} fill="none" stroke="var(--em-ring-track)" stroke-width="10" />
         <circle
           ref={arc}
           class="ring__arc"
@@ -146,7 +149,7 @@ function TimerFace({ children }: { children?: ComponentChildren }) {
           r={RING_R}
           fill="none"
           stroke="var(--em-ring-fill)"
-          stroke-width="6"
+          stroke-width="10"
           stroke-linecap="round"
           pathLength={1}
           transform="rotate(-90 180 180)"
@@ -287,7 +290,8 @@ function Controls() {
         icon="reset"
         label="Reset"
         tip="Reset (R)"
-        size={48}
+        size={52}
+        iconSize={22}
         class="iconbtn--ghost"
         data-timer-control
         data-testid="timer-reset"
@@ -310,7 +314,8 @@ function Controls() {
         icon="skip"
         label="Skip"
         tip="Skip (S)"
-        size={48}
+        size={52}
+        iconSize={22}
         class="iconbtn--ghost"
         data-timer-control
         data-testid="timer-skip"
@@ -321,28 +326,13 @@ function Controls() {
   );
 }
 
-function TodaySummary({ compact }: { compact?: boolean }) {
+/** Desktop side card only: the phone Timer shows no stats at all. */
+function TodaySummary() {
   track();
   void clockTick.value;
   const t = core.select.today();
   const goal = Math.round(t.goalMs / MIN);
   const mins = Math.round(t.focusMs / MIN);
-  if (compact) {
-    return (
-      <div class="todaystrip" data-testid="today-goal">
-        <GoalRing summary={t} size={40} testid="today-ring" />
-        <div class="todaystrip__text">
-          <strong>
-            {mins} of {goal} min
-          </strong>
-          <span>{plural(t.sessions, 'session')} today</span>
-        </div>
-        <a href="#/stats" class="todaystrip__link">
-          Stats
-        </a>
-      </div>
-    );
-  }
   return (
     <div class="today" data-testid="today-goal">
       <GoalRing summary={t} size={72} testid="today-ring" />
@@ -391,9 +381,30 @@ function UpNext() {
   );
 }
 
+function Greeting() {
+  track();
+  const d = data.value;
+  const g = greetingFor({
+    now: new Date(),
+    studyDay: todayKey(Date.now()),
+    name: d.settings.displayName,
+    todaySessions: core.select.today().sessions,
+    streak: core.select.streak(),
+    copy: (core.copy as unknown as { sky: SkyCopy }).sky,
+  });
+  return (
+    <div class="thead__text">
+      <p class="greeting" data-testid="greeting">
+        {g.title}
+      </p>
+    </div>
+  );
+}
+
 export function Timer() {
   const s = timerState.value;
   const [picker, setPicker] = useState(false);
+  const narrow = useNarrow();
   const isBreak = s.phase !== 'focus';
   const msg = message.value;
   const prompt = breakPrompt.value;
@@ -401,6 +412,10 @@ export function Timer() {
     <div class="timerpage">
       <h1 class="sr-only">Timer</h1>
       <div class="timerpage__main">
+        <header class="thead">
+          <Greeting />
+          {narrow ? <Companion size={68} mirror class="thead__mascot" /> : null}
+        </header>
         <Segmented
           options={MODE_OPTIONS}
           value={s.phase}
@@ -409,25 +424,33 @@ export function Timer() {
           full
           class="modes"
         />
-        <div class="ringbox">
-          <TimerFace>
-            <TaskButton onOpen={() => setPicker(true)} />
-            <CycleDots />
-          </TimerFace>
-          <Confetti trigger={confettiKey.value} />
-        </div>
-        <Controls />
-        <p class="msg" data-testid="message-line">
-          {msg}
-        </p>
-        {isBreak && prompt ? (
-          <div class="promptcard" data-testid="break-prompt">
-            <div class="promptcard__label">Break idea</div>
-            <p class="promptcard__text">{prompt}</p>
+        <div class="timerpage__mid">
+          <div class="bubblewrap">
+            <div class="bubble" data-testid="timer-bubble">
+              <TimerFace>
+                <TaskButton onOpen={() => setPicker(true)} />
+                <CycleDots />
+              </TimerFace>
+            </div>
+            {narrow ? null : <Companion size={112} class="timermascot" />}
+            <Confetti trigger={confettiKey.value} />
           </div>
-        ) : null}
-        <div class="timerpage__strip">
-          <TodaySummary compact />
+          <div class="controlswrap">
+            <Controls />
+            <div class="timerpage__aux">
+              <p class={`msg${msg ? ' msgchip' : ''}`} data-testid="message-line">
+                {msg}
+              </p>
+              {isBreak && prompt ? (
+                <div class="promptcard card" data-testid="break-prompt">
+                  <div class="promptcard__label">Break idea</div>
+                  <p class="promptcard__text" title={prompt}>
+                    {prompt}
+                  </p>
+                </div>
+              ) : null}
+            </div>
+          </div>
         </div>
       </div>
       <aside class="timerpage__side" aria-label="Today">

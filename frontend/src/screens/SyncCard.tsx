@@ -1,27 +1,35 @@
 // Settings > Sync (design.md 7.5). Quiet by design: all sync copy lives in this card. It talks to
 // the engine only through core.loadSync() and the SyncEngine API of contract.md section 3.7.
-import { useEffect, useId, useState } from 'preact/hooks';
-import { formatDayLabel, hasStoredAuth, todayKey, type SyncEngine, type SyncState } from '@core';
+import { useEffect, useState } from 'preact/hooks';
+import { useUid } from '../components/uid';
+import {
+  SYNC_CODE_MAX,
+  SYNC_CODE_MIN,
+  formatDayLabel,
+  hasStoredAuth,
+  normalizeSyncCode,
+  todayKey,
+  type SyncEngine,
+  type SyncState,
+} from '@core';
 import { core, data } from '../app/coreBridge';
 import { Dialog } from '../components/Dialog';
 import { Icon, type IconName } from '../components/Icon';
 import { Button } from '../components/ui';
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const SIGNED_IN = new Set(['idle', 'syncing', 'offline', 'error', 'auth-expired']);
 
-const REQUEST_ERRORS = {
-  'invalid-email': 'Enter a valid email address.',
-  'rate-limited': 'Too many tries. Wait a minute and try again.',
+const ERRORS: Record<string, string> = {
+  code_empty: `Use at least ${SYNC_CODE_MIN} characters.`,
+  code_too_short: `Use at least ${SYNC_CODE_MIN} characters.`,
+  code_too_long: `That code is too long. Use up to ${SYNC_CODE_MAX} characters.`,
+  code_invalid_chars: 'Use letters, numbers, spaces, dashes, underscores or dots.',
+  confirm_email_on:
+    'Supabase still has Confirm email on. Turn it off under Authentication → Sign In / Providers → Email.',
+  rate_limited: 'Too many tries. Wait a minute and try again.',
   network: "Can't reach the server. Check your connection and try again.",
   unknown: 'Something went wrong. Try again in a moment.',
-} as const;
-const VERIFY_ERRORS = {
-  'invalid-code': "That code didn't work. Check the latest email or send a new one.",
-  expired: "That code didn't work. Check the latest email or send a new one.",
-  network: "Can't reach the server. Check your connection and try again.",
-  unknown: 'Something went wrong. Try again in a moment.',
-} as const;
+};
 
 function relative(ts: number, now: number): string {
   const s = Math.max(0, Math.round((now - ts) / 1000));
@@ -43,7 +51,7 @@ function statusView(st: SyncState | null, now: number): { icon: IconName; text: 
     case 'error':
       return { icon: 'alert', text: "Couldn't sync. Retrying." };
     case 'auth-expired':
-      return { icon: 'alert', text: 'Sync paused: sign in again' };
+      return { icon: 'alert', text: 'Sync paused: link this device again' };
     default:
       return st.lastSyncedAt
         ? { icon: 'check-circle', text: `Synced · ${relative(st.lastSyncedAt, now)}` }
@@ -55,16 +63,12 @@ export function SyncCard() {
   const meta = data.value.meta.sync;
   const [engine, setEngine] = useState<SyncEngine | null>(null);
   const [st, setSt] = useState<SyncState | null>(null);
-  const [stage, setStage] = useState<'email' | 'code'>('email');
-  const [email, setEmail] = useState(meta.email ?? '');
   const [code, setCode] = useState('');
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
-  const [resendAt, setResendAt] = useState(0);
   const [now, setNow] = useState(Date.now());
   const [confirmOut, setConfirmOut] = useState(false);
-  const emailId = useId();
-  const codeId = useId();
+  const codeId = useUid();
 
   const attach = async (): Promise<SyncEngine | null> => {
     try {
@@ -88,163 +92,80 @@ export function SyncCard() {
     setSt(engine.state());
     return engine.subscribe(setSt);
   }, [engine]);
-  useEffect(() => {
-    if (st?.status === 'code-sent' && stage === 'email') {
-      setStage('code');
-      if (st.email) setEmail(st.email);
-    }
-  }, [st?.status]);
 
   const status = st?.status;
   const signedIn = status ? SIGNED_IN.has(status) : meta.userId !== null;
   const expired = status === 'auth-expired';
-  const shownEmail = st?.email ?? meta.email ?? email;
   const rejected = st?.rejected ?? meta.rejected;
 
-  const send = async () => {
+  const link = async () => {
+    if (busy) return;
     setErr('');
-    const addr = email.trim();
-    if (!EMAIL_RE.test(addr)) {
-      setErr(REQUEST_ERRORS['invalid-email']);
+    const n = normalizeSyncCode(code);
+    if (!n.ok) {
+      setErr(ERRORS[n.error] ?? ERRORS.unknown!);
       return;
     }
     setBusy(true);
     const e = engine ?? (await attach());
     if (!e) {
       setBusy(false);
-      setErr(REQUEST_ERRORS.network);
+      setErr(ERRORS.network!);
       return;
     }
-    const r = await e.requestCode(addr);
+    const r = await e.signInWithCode(code);
     setBusy(false);
-    if (r.ok) {
-      setStage('code');
-      setCode('');
-      setResendAt(Date.now() + 60_000);
-    } else setErr(REQUEST_ERRORS[r.error]);
-  };
-
-  const verify = async (value: string) => {
-    if (!engine || value.length !== 6 || busy) return;
-    setBusy(true);
-    setErr('');
-    const r = await engine.verifyCode(email.trim(), value);
-    setBusy(false);
-    if (r.ok) {
-      setStage('email');
-      setCode('');
-    } else {
-      setErr(VERIFY_ERRORS[r.error]);
-      setCode('');
-    }
+    if (r.ok) setCode('');
+    else setErr(r.message ?? ERRORS[r.error] ?? ERRORS.unknown!);
   };
 
   const view = statusView(st, now);
-  const secs = Math.min(60, Math.max(0, Math.ceil((resendAt - now) / 1000)));
-
-  const emailForm = (
-    <form
-      class="sync__form"
-      onSubmit={(e) => {
-        e.preventDefault();
-        void send();
-      }}
-      novalidate
-    >
-      <label class="field__label" for={emailId}>
-        Email
-      </label>
-      <input
-        id={emailId}
-        class="input"
-        type="email"
-        data-testid="sync-email-input"
-        autoComplete="email"
-        inputMode="email"
-        value={email}
-        placeholder="you@example.com"
-        aria-describedby={err ? 'sync-err' : undefined}
-        aria-invalid={err ? true : undefined}
-        onFocus={() => void attach()}
-        onInput={(e) => {
-          setEmail((e.target as HTMLInputElement).value);
-          setErr('');
-        }}
-      />
-      {err ? (
-        <p class="error" id="sync-err">
-          {err}
-        </p>
-      ) : null}
-      <div class="sync__actions">
-        <Button variant="secondary" type="submit" disabled={busy} data-testid="sync-send">
-          {busy ? 'Sending…' : 'Send sign-in link'}
-        </Button>
-      </div>
-    </form>
-  );
-
   const codeForm = (
     <form
       class="sync__form"
       onSubmit={(e) => {
         e.preventDefault();
-        void verify(code);
+        void link();
       }}
+      novalidate
     >
-      <p class="sync__lead">Check your email. Open the link on this device, or type the 6-digit code here.</p>
       <label class="field__label" for={codeId}>
-        6-digit code
+        Sync code
       </label>
       <input
         id={codeId}
-        class="input input--code"
+        class="input"
         data-testid="sync-code-input"
-        autoComplete="one-time-code"
-        inputMode="numeric"
-        maxLength={6}
+        autoComplete="off"
+        autoCapitalize="none"
+        autoCorrect="off"
+        spellcheck={false}
         value={code}
-        placeholder="123456"
-        data-autofocus
-        aria-describedby={err ? 'sync-err' : undefined}
+        placeholder="a secret phrase"
+        aria-describedby={err ? 'sync-err sync-help' : 'sync-help'}
         aria-invalid={err ? true : undefined}
+        onFocus={() => void attach()}
         onInput={(e) => {
-          const v = (e.target as HTMLInputElement).value.replace(/\D/g, '').slice(0, 6);
-          setCode(v);
+          setCode((e.target as HTMLInputElement).value);
           setErr('');
-          if (v.length === 6) void verify(v);
         }}
       />
+      <p class="smallprint" id="sync-help">
+        Pick a secret phrase ({SYNC_CODE_MIN}+ characters). Type the same code on your other device to link
+        them. Anyone with the code can see your history, so keep it to yourself.
+      </p>
       {err ? (
-        <p class="error" id="sync-err">
+        <p class="error" id="sync-err" role="alert">
           {err}
         </p>
       ) : null}
       <div class="sync__actions">
-        <Button
-          variant="secondary"
-          type="submit"
-          disabled={busy || code.length !== 6}
-          data-testid="sync-verify"
-        >
-          {busy ? 'Checking…' : 'Verify'}
-        </Button>
-        <Button
-          variant="text"
-          onClick={() => {
-            setStage('email');
-            setErr('');
-            setCode('');
-          }}
-        >
-          Use a different email
-        </Button>
-        <Button variant="text" disabled={secs > 0 || busy} onClick={() => void send()}>
-          {secs > 0 ? `Send again (${secs})` : 'Send again'}
+        <Button variant="secondary" type="submit" disabled={busy} data-testid="sync-send">
+          {busy ? 'Linking…' : 'Link this device'}
         </Button>
       </div>
       {meta.lastUserId !== null ? (
-        <p class="smallprint">This device's data will be added to the account you sign in to.</p>
+        <p class="smallprint">This device's data will be added to the account you link to.</p>
       ) : null}
     </form>
   );
@@ -259,7 +180,7 @@ export function SyncCard() {
       {signedIn ? (
         <>
           <p class="sync__lead">
-            Signed in as <strong>{shownEmail}</strong>
+            <strong>Linked</strong>
           </p>
           <p class="syncstatus" data-testid="sync-status" role="status">
             <Icon name={view.icon} size={16} class={view.spin ? 'spin' : ''} />
@@ -270,7 +191,7 @@ export function SyncCard() {
               {rejected === 1 ? "1 change couldn't sync" : `${rejected} changes couldn't sync`}
             </p>
           ) : null}
-          {expired ? (stage === 'code' ? codeForm : emailForm) : null}
+          {expired ? codeForm : null}
           <div class="sync__actions">
             {!expired ? (
               <Button
@@ -287,12 +208,10 @@ export function SyncCard() {
             </Button>
           </div>
         </>
-      ) : stage === 'code' ? (
-        codeForm
       ) : (
         <>
-          <p class="sync__lead">Sign in to sync across devices.</p>
-          {emailForm}
+          <p class="sync__lead">Link this device to sync across devices.</p>
+          {codeForm}
           <p class="smallprint">Optional. Em Time works fully without an account.</p>
         </>
       )}
@@ -310,7 +229,7 @@ export function SyncCard() {
                 onClick={async () => {
                   setConfirmOut(false);
                   await engine?.signOut();
-                  setStage('email');
+                  setCode('');
                 }}
               >
                 Sign out

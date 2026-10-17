@@ -10,6 +10,7 @@ import { TableToggle } from '../charts/ChartTable';
 import { TaskBars } from '../charts/TaskBars';
 import { TrendChart } from '../charts/TrendChart';
 import { WeekColumns } from '../charts/WeekColumns';
+import { Companion } from '../components/Companion';
 import { Button, IconButton, Segmented } from '../components/ui';
 import { useNarrow } from '../app/useNarrow';
 
@@ -36,10 +37,13 @@ export function Stats() {
 
   return (
     <div class="page page--stats">
-      <ExportReminder />
       <div class="pagehead">
         <h1 class="pagehead__title">Stats</h1>
+        <div class="pagehead__end">
+          <Companion size={narrow ? 48 : 56} idleOnly />
+        </div>
       </div>
+      <ExportReminder />
 
       <div class="tiles">
         <StatTile label="Today" testid="today-tile">
@@ -59,12 +63,9 @@ export function Stats() {
 
       <section class="section" aria-labelledby="h-week">
         <div class="section__head">
-          <div>
-            <h2 id="h-week" class="section__title">
-              This week
-            </h2>
-            <p class="section__sub">{formatRange(week.start, week.end)}</p>
-          </div>
+          <h2 id="h-week" class="section__title sectionlabel">
+            This week
+          </h2>
           <div class="weeknav">
             {offset !== 0 ? (
               <Button variant="secondary" onClick={() => setOffset(0)}>
@@ -73,6 +74,8 @@ export function Stats() {
             ) : null}
             <IconButton
               icon="chevron-left"
+              size={48}
+              class="iconbtn--ghost"
               label="Previous week"
               data-testid="week-prev"
               disabled={!week.hasPrev}
@@ -80,6 +83,8 @@ export function Stats() {
             />
             <IconButton
               icon="chevron-right"
+              size={48}
+              class="iconbtn--ghost"
               label="Next week"
               data-testid="week-next"
               disabled={!week.hasNext}
@@ -87,7 +92,8 @@ export function Stats() {
             />
           </div>
         </div>
-        <div class="card">
+        <div class="card card--solid">
+          <p class="section__sub">{formatRange(week.start, week.end)}</p>
           <div class="weekgrid">
             <div class="weekgrid__cols">
               <div class="bigstat" data-testid="week-total">
@@ -111,15 +117,13 @@ export function Stats() {
 
       <section class="section" aria-labelledby="h-heat">
         <div class="section__head">
-          <div>
-            <h2 id="h-heat" class="section__title">
-              Last 2 months
-            </h2>
-            <p class="section__sub">Daily focus time against your goal of {formatDuration(goalMin * MIN)}</p>
-          </div>
+          <h2 id="h-heat" class="section__title sectionlabel">
+            Last 2 months
+          </h2>
         </div>
         <div class="heatgrid">
-          <div class="card">
+          <div class="card card--solid">
+            <p class="section__sub">Daily focus time against your goal of {formatDuration(goalMin * MIN)}</p>
             <Heatmap
               cells={cells}
               weekStartsOn={d.settings.weekStartsOn}
@@ -128,7 +132,7 @@ export function Stats() {
             />
             <TableToggle on={heatTable} onToggle={() => setHeatTable(!heatTable)} />
           </div>
-          <div class="card summary">
+          <div class="card card--solid summary">
             <dl class="summary__list">
               <div class="summary__row">
                 <dt>Active days</dt>
@@ -157,13 +161,10 @@ export function Stats() {
       </section>
 
       <section class="section" aria-labelledby="h-trend">
-        <div class="section__head section__head--stack">
-          <div>
-            <h2 id="h-trend" class="section__title">
-              Trend
-            </h2>
-            <p class="section__sub">Daily focus, 7-day average</p>
-          </div>
+        <div class="section__head">
+          <h2 id="h-trend" class="section__title sectionlabel">
+            Trend
+          </h2>
           <Segmented
             label="Trend range"
             value={range}
@@ -175,7 +176,8 @@ export function Stats() {
             }))}
           />
         </div>
-        <div class="card">
+        <div class="card card--solid">
+          <p class="section__sub">Daily focus, 7-day average</p>
           <TrendChart
             points={trend}
             range={range}

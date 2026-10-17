@@ -15,16 +15,20 @@ import {
   type ImportError,
   type ImportResult,
   type PresetId,
+  type ThemeId,
   type Settings as SettingsT,
 } from '@core';
 import { ExportReminder, exportBackup } from '../app/Banners';
 import { breakPrompt, message } from '../app/actions';
 import { core, data } from '../app/coreBridge';
+import { useNarrow } from '../app/useNarrow';
+import { Companion } from '../components/Companion';
 import { Dialog } from '../components/Dialog';
 import { Button, Card, Segmented, Select, Stepper, Switch } from '../components/ui';
 import { playChime, unlockAudio } from '../platform/audio';
 import { isIOS, isStandalone, notificationPermission, notificationsSupported } from '../platform/env';
 import { requestPermission } from '../platform/notify';
+import { clearUiMemory } from '../platform/uiMemory';
 import { wakeLockSupported } from '../platform/wakeLock';
 import { SyncCard } from './SyncCard';
 
@@ -261,22 +265,101 @@ function MessagesCard({ s }: { s: SettingsT }) {
   );
 }
 
+function YouCard({ s }: { s: SettingsT }) {
+  // Edit locally and commit on blur or Enter, so every keystroke does not bump the synced settings.
+  const [text, setText] = useState<string | null>(null);
+  const commit = () => {
+    if (text === null) return;
+    set({ displayName: text.trim() });
+    setText(null);
+  };
+  return (
+    <Card title="You">
+      <div class="field">
+        <label for="display-name" class="field__label">
+          Your name
+        </label>
+        <input
+          id="display-name"
+          class="input"
+          data-testid="settings-display-name"
+          value={text ?? s.displayName}
+          maxLength={LIMITS.displayName[1]}
+          placeholder="Em"
+          autoComplete="off"
+          aria-describedby="display-name-hint"
+          onInput={(e) => {
+            const v = (e.target as HTMLInputElement).value;
+            setText(v);
+            set({ displayName: v.trim() });
+          }}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') commit();
+          }}
+        />
+        <p class="hint" id="display-name-hint">
+          Used in greetings. Leave it blank for no name.
+        </p>
+      </div>
+    </Card>
+  );
+}
+
+const THEME_OPTIONS: { value: ThemeId; label: string; testid: string }[] = [
+  { value: 'sky', label: 'Follow the sky', testid: 'settings-theme-sky' },
+  { value: 'light', label: 'Always light', testid: 'settings-theme-light' },
+  { value: 'dark', label: 'Always dark', testid: 'settings-theme-dark' },
+];
+
 function AppearanceCard({ s }: { s: SettingsT }) {
+  const narrow = useNarrow();
   return (
     <Card title="Appearance">
-      <div class="setrow">
-        <div class="setrow__label">Theme</div>
-        <Segmented
-          testid="settings-theme"
-          label="Theme"
-          value={s.theme}
-          onChange={(v) => set({ theme: v })}
-          options={[
-            { value: 'light', label: 'Light' },
-            { value: 'dark', label: 'Dark' },
-          ]}
-        />
+      <div class={narrow ? 'themefield' : 'setrow'}>
+        <div class="setrow__label" id="theme-label">
+          Theme
+        </div>
+        {narrow ? (
+          <div class="radiogroup themelist" role="radiogroup" aria-labelledby="theme-label" data-testid="settings-theme">
+            {THEME_OPTIONS.map((o) => (
+              <label class="radiorow radiorow--tall" key={o.value} data-testid={o.testid}>
+                <input
+                  type="radio"
+                  name="theme"
+                  checked={s.theme === o.value}
+                  onChange={() => set({ theme: o.value })}
+                />
+                <span class="radiorow__dot" />
+                <span>{o.label}</span>
+              </label>
+            ))}
+          </div>
+        ) : (
+          <Segmented
+            testid="settings-theme"
+            label="Theme"
+            value={s.theme}
+            onChange={(v) => set({ theme: v })}
+            options={THEME_OPTIONS}
+          />
+        )}
       </div>
+      <p class="hint">Follow the sky changes colors with the time of day.</p>
+      <Switch
+        checked={s.mascot}
+        onChange={(v) => set({ mascot: v })}
+        label="Cloud friend"
+        hint="A little cloud that keeps you company."
+        testid="settings-mascot"
+      />
+      <Switch
+        checked={s.stickers}
+        onChange={(v) => set({ stickers: v })}
+        label="Sky stickers"
+        hint="Tiny stickers that float by and celebrate finished sessions."
+        testid="settings-stickers"
+      />
       <Select
         label="Week starts on"
         value={s.weekStartsOn}
@@ -450,6 +533,7 @@ function EraseFlow() {
       } else {
         await eng?.signOut();
         core.store.eraseAll(Date.now());
+        clearUiMemory();
       }
       core.timer.adopt(core.store.get().timer);
       message.value = null;
@@ -575,13 +659,18 @@ export function ShortcutsList() {
 export function Settings() {
   const s = data.value.settings;
   const syncOn = isSyncConfigured(readSyncEnv());
+  const narrow = useNarrow();
   return (
     <div class="page page--settings">
-      <ExportReminder />
       <div class="pagehead">
         <h1 class="pagehead__title">Settings</h1>
+        <div class="pagehead__end">
+          <Companion size={narrow ? 48 : 56} idleOnly />
+        </div>
       </div>
+      <ExportReminder />
       <div class="stack">
+        <YouCard s={s} />
         <TimerCard s={s} />
         <GoalCard s={s} />
         <SoundCard s={s} />

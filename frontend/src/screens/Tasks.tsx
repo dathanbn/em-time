@@ -1,4 +1,5 @@
-import { useEffect, useId, useRef, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
+import { useUid } from '../components/uid';
 import {
   LIMITS,
   ValidationError,
@@ -9,7 +10,10 @@ import {
 } from '@core';
 import { CAT_NAMES, categoryOf, doneTasks, liveCategories, openTasks } from '../app/selectors';
 import { clockTick, core, data } from '../app/coreBridge';
+import { useNarrow } from '../app/useNarrow';
+import { Companion } from '../components/Companion';
 import { Dialog } from '../components/Dialog';
+import { EmptyMascot } from '../components/EmptyMascot';
 import { Icon } from '../components/Icon';
 import { Button, IconButton, Menu, Select } from '../components/ui';
 
@@ -195,7 +199,7 @@ function TaskRow({
   const [text, setText] = useState(task.name);
   const [err, setErr] = useState('');
   const mins = core.select.taskWeekMs(task.id);
-  const id = useId();
+  const id = useUid();
   const save = () => {
     try {
       core.store.updateTask(task.id, { name: text });
@@ -316,7 +320,7 @@ function CategoryRow({ cat, onDelete }: { cat: Category; onDelete: (c: Category)
       setErr(errorText(x, 'category'));
     }
   };
-  const nid = useId();
+  const nid = useUid();
   const single = liveCategories(data.value).length <= 1;
   return (
     <li class="crow" data-testid="category-row">
@@ -353,7 +357,7 @@ function CategoryRow({ cat, onDelete }: { cat: Category; onDelete: (c: Category)
 }
 
 function Categories({ onDelete }: { onDelete: (c: Category) => void }) {
-  const newId = useId();
+  const newId = useUid();
   const d = data.value;
   const cats = liveCategories(d);
   const [name, setName] = useState('');
@@ -413,6 +417,7 @@ export function Tasks() {
   const [clearing, setClearing] = useState(false);
   const [manage, setManage] = useState(false);
   const [moveTo, setMoveTo] = useState('');
+  const narrow = useNarrow();
   const cats = liveCategories(d);
   const askDeleteCat = (c: Category) => {
     setMoveTo(cats.find((x) => x.id !== c.id)?.id ?? '');
@@ -423,9 +428,12 @@ export function Tasks() {
     <div class="page page--tasks">
       <div class="pagehead">
         <h1 class="pagehead__title">Tasks</h1>
-        <Button variant="secondary" class="only-phone" onClick={() => setManage(true)}>
-          Manage categories
-        </Button>
+        <div class="pagehead__end">
+          <Button variant="secondary" class="only-phone" onClick={() => setManage(true)}>
+            Manage categories
+          </Button>
+          <Companion size={narrow ? 48 : 56} idleOnly />
+        </div>
       </div>
       <div class="tasks-grid">
         <div class="tasks-grid__main">
@@ -435,8 +443,11 @@ export function Tasks() {
           <div class="card card--flush">
             {open.length === 0 ? (
               <div class="empty">
-                <p class="empty__title">Nothing here yet.</p>
-                <p class="empty__text">Add what you're working on.</p>
+                <EmptyMascot size={narrow ? 64 : 72} />
+                <div>
+                  <p class="empty__title">Nothing here yet.</p>
+                  <p class="empty__text">Add what you're working on.</p>
+                </div>
               </div>
             ) : (
               <ul class="tlist" aria-label="Open tasks">
