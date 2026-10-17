@@ -29,23 +29,35 @@ optional real-project e2e test, passed through the shell for that test run.
 
 1. ~~Create a Supabase project.~~ Done.
 2. ~~Run the migration~~ (`supabase db push`, or paste the file into the SQL editor). Done.
-3. Dashboard, Authentication, Providers: Email enabled; "Confirm email" on; password sign-in not
-   used.
-4. Dashboard, Authentication, URL configuration: Site URL `https://dathanbn.github.io/em-time/`.
-   Redirect URLs, add:
-   - `https://dathanbn.github.io/em-time/`
-   - `http://localhost:5173/em-time/`
-   - `http://localhost:4173/em-time/`
-5. Dashboard, Authentication, Email templates, Magic Link: keep the link and add the code line,
-   for example "Or type this code in Em Time: {{ .Token }}". This is required for the iPhone
-   home-screen app, whose storage is separate from Safari, so a link opened from Mail cannot sign
-   it in but a typed 6-digit code can.
-6. Optional: custom SMTP. The built-in sender is rate limited (a few emails per hour), which is
-   fine for one user.
-7. GitHub repository, Settings, Secrets and variables, Actions: add `VITE_SUPABASE_URL` and
+3. Dashboard, Authentication, Sign In / Providers, Email: "Enable Sign in / up" ON and
+   "Confirm email" OFF. That is the whole dashboard setup: no URL configuration, no email
+   templates, no SMTP, no organization invite.
+4. GitHub repository, Settings, Secrets and variables, Actions: add `VITE_SUPABASE_URL` and
    `VITE_SUPABASE_ANON_KEY` (the anon or publishable key, never the service role key). Re-run the
    workflow.
-8. Locally: copy `.env.example` to `.env.local` (repo root) and keep the same two values.
+5. Locally: copy `.env.example` to `.env.local` (repo root) and keep the same two values.
+
+## Sign-in: the sync code
+
+There are no emails. The user chooses a sync code (at least 8 characters) and types it once per
+device. The app derives an address (`<code>@dathanbn.github.io`, nothing is ever sent to it) and a password
+(SHA-256 of `em-time:v1:` + the code) from it, signs in, and creates the account the first time the
+code is used anywhere. If "Confirm email" is still on, creating the account returns no session and
+the app shows a message asking to turn it off.
+
+Security model, honestly:
+
+- The sync code is the only secret. Anyone who knows it can read and write that account's data.
+  Row level security keeps accounts apart, but it cannot tell a person who knows the code from
+  its owner.
+- Pick something not guessable. 8 characters is the enforced minimum, and a longer phrase is
+  better. The derived address contains the code, so it is not hidden from Supabase or from anyone
+  with access to the project dashboard.
+- If she forgets the code she can choose a new one on a device that still has her history. That
+  creates a new account and the device's history is pushed to it. The old account's data stays in
+  the old account, unreachable without the old code.
+- The code and password are not saved by the app (not in the stored document and not in backups);
+  only the Supabase session token stays on the device, until she signs out.
 
 ## What the schema does
 
