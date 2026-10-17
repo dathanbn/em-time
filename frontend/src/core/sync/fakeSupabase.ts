@@ -11,7 +11,10 @@ export interface FakeServer {
   /** ms since epoch the server pretends it is; advances with every accepted write */
   serverNow: number;
   users: Map<string, string>; // email -> user id
-  validCode: string;
+  passwords: Map<string, string>; // email -> password
+  /** mirrors the Supabase "Confirm email" switch: sign-up then returns a user and no session */
+  confirmEmail: boolean;
+  confirmed: Set<string>;
   /** return an error to fail the next matching call */
   failWhen: ((op: Op) => PostgrestErrorLike | AuthErrorLike | Error | null) | null;
   log: Op[];
@@ -20,7 +23,7 @@ export interface FakeServer {
 }
 
 export interface Op {
-  kind: 'upsert' | 'select' | 'getSession' | 'signInWithOtp' | 'verifyOtp' | 'signOut';
+  kind: 'upsert' | 'select' | 'getSession' | 'signInWithPassword' | 'signUp' | 'signOut';
   table?: SyncTable;
   rows?: Array<Record<string, unknown>>;
   since?: string;
@@ -32,7 +35,9 @@ export function createFakeServer(startMs = Date.UTC(2026, 9, 14, 12, 0, 0)): Fak
     tables: { categories: new Map(), tasks: new Map(), sessions: new Map(), settings: new Map() },
     serverNow: startMs,
     users: new Map(),
-    validCode: '123456',
+    passwords: new Map(),
+    confirmEmail: false,
+    confirmed: new Set(),
     failWhen: null,
     log: [],
     gate: null,
@@ -93,28 +98,47 @@ export function createFakeClient(server: FakeServer): FakeClient {
 
   const client: SupabaseLike = {
     auth: {
-      async signInWithOtp({ email }) {
-        const op: Op = { kind: 'signInWithOtp', email };
-        await wait(op);
-        const f = failure(op);
-        if (f instanceof Error) throw f;
-        return { error: (f as AuthErrorLike | null) ?? null };
-      },
-      async verifyOtp({ email, token }) {
-        const op: Op = { kind: 'verifyOtp', email };
+      async signInWithPassword({ email, password }) {
+        const op: Op = { kind: 'signInWithPassword', email };
         await wait(op);
         const f = failure(op);
         if (f instanceof Error) throw f;
         if (f) return { data: { session: null }, error: f as AuthErrorLike };
-        if (token !== server.validCode) {
+        if (!server.passwords.has(email) || server.passwords.get(email) !== password) {
           return {
             data: { session: null },
-            error: { message: 'Token has expired or is invalid', code: 'otp_expired', status: 403 },
+            error: { message: 'Invalid login credentials', code: 'invalid_credentials', status: 400 },
+          };
+        }
+        if (server.confirmEmail && !server.confirmed.has(email)) {
+          return {
+            data: { session: null },
+            error: { message: 'Email not confirmed', code: 'email_not_confirmed', status: 400 },
           };
         }
         setSession(userFor(email), email);
         emit('SIGNED_IN', session);
         return { data: { session }, error: null };
+      },
+      async signUp({ email, password }) {
+        const op: Op = { kind: 'signUp', email };
+        await wait(op);
+        const f = failure(op);
+        if (f instanceof Error) throw f;
+        if (f) return { data: { session: null, user: null }, error: f as AuthErrorLike };
+        if (server.passwords.has(email)) {
+          return {
+            data: { session: null, user: null },
+            error: { message: 'User already registered', code: 'user_already_exists', status: 422 },
+          };
+        }
+        server.passwords.set(email, password);
+        const id = userFor(email);
+        if (server.confirmEmail) return { data: { session: null, user: { id } }, error: null };
+        server.confirmed.add(email);
+        setSession(id, email);
+        emit('SIGNED_IN', session);
+        return { data: { session, user: { id } }, error: null };
       },
       async getSession() {
         await wait({ kind: 'getSession' });

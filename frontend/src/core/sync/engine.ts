@@ -26,17 +26,20 @@ import type {
 } from '../api';
 import type { Category, Session, SyncState, SyncStatus, SyncTable, Task } from '../types';
 import { fromRow, toRow } from './rows';
+import { deriveSyncCredentials, SYNC_CODE_EMAIL_DOMAIN, type SyncCodeError } from './syncCode';
+
+export type SignInWithCodeError = SyncCodeError | 'confirm_email_on' | 'rate_limited' | 'network' | 'unknown';
+
+export type SignInWithCodeResult = { ok: true } | { ok: false; error: SignInWithCodeError; message?: string };
+
+export const CONFIRM_EMAIL_ON_MESSAGE =
+  'Confirm email is still on in Supabase. Turn off "Confirm email" under Authentication, Sign In / Providers, Email, then try again.';
 
 export interface SyncEngine {
   state(): SyncState;
   subscribe(fn: (s: SyncState) => void): () => void;
-  requestCode(
-    email: string,
-  ): Promise<{ ok: true } | { ok: false; error: 'invalid-email' | 'rate-limited' | 'network' | 'unknown' }>;
-  verifyCode(
-    email: string,
-    code: string,
-  ): Promise<{ ok: true } | { ok: false; error: 'invalid-code' | 'expired' | 'network' | 'unknown' }>;
+  /** Signs in (or creates the account on first use) with the user's sync code. No email is sent. */
+  signInWithCode(code: string): Promise<SignInWithCodeResult>;
   signOut(): Promise<void>; // keeps local data; clears meta.sync.userId, dirty, cursors
   syncNow(): Promise<SyncResult>;
   eraseCloud(): Promise<{ ok: boolean }>; // store.tombstoneAll, push, then store.eraseAll
@@ -123,30 +126,9 @@ class PushError extends Error {
   }
 }
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const EPOCH_ISO = new Date(0).toISOString();
 
 const emptyCounts = (): Record<SyncTable, number> => ({ categories: 0, tasks: 0, sessions: 0, settings: 0 });
-
-function redirectUrl(): string {
-  const base = (import.meta as { env?: { BASE_URL?: string } }).env?.BASE_URL ?? '/';
-  return typeof location !== 'undefined' ? location.origin + base : base;
-}
-
-/** After the client has exchanged ?code=, drop it from the address bar and keep the hash route. */
-function stripAuthParams(): void {
-  if (typeof location === 'undefined' || typeof history === 'undefined') return;
-  const params = new URLSearchParams(location.search);
-  const keys = ['code', 'error', 'error_code', 'error_description'];
-  if (!keys.some((k) => params.has(k))) return;
-  for (const k of keys) params.delete(k);
-  const qs = params.toString();
-  try {
-    history.replaceState(history.state, '', location.pathname + (qs ? `?${qs}` : '') + location.hash);
-  } catch {
-    /* ignore */
-  }
-}
 
 export function createSyncEngine(opts: {
   store: EmStore;
@@ -158,10 +140,9 @@ export function createSyncEngine(opts: {
   const deps = opts.deps ?? createDefaultSyncDeps();
   const client: SupabaseLike = opts.createClient(opts.env.url, opts.env.anonKey, {
     auth: {
-      flowType: 'pkce',
       persistSession: true,
       autoRefreshToken: true,
-      detectSessionInUrl: true,
+      detectSessionInUrl: false,
       storageKey: AUTH_STORAGE_KEY,
     },
   });
@@ -169,7 +150,6 @@ export function createSyncEngine(opts: {
   let disposed = false;
   let signingOut = false; // set while our own signOut runs, so its SIGNED_OUT event is not an expiry
   let status: SyncStatus = store.get().meta.sync.userId !== null ? 'idle' : 'signed-out';
-  let pendingEmail: string | null = null; // email a code was sent to, before sign-in completes
   let nextRetryAt: number | null = null;
   let failures = 0;
   let retryTimer: unknown = null;
@@ -188,7 +168,7 @@ export function createSyncEngine(opts: {
     const m = store.get().meta.sync;
     return {
       status,
-      email: m.email ?? pendingEmail,
+      email: m.email,
       lastSyncedAt: m.lastSyncedAt,
       pending: pendingCount(),
       rejected: m.rejected,
@@ -216,7 +196,9 @@ export function createSyncEngine(opts: {
   function adoptSession(session: SessionLike): void {
     const uid = session.user.id;
     const m = store.get().meta.sync;
-    const email = session.user.email ?? m.email ?? pendingEmail;
+    // The derived address contains the sync code, so it is never written to AppData (exports, backups).
+    const raw = session.user.email ?? m.email;
+    const email = raw !== null && raw.endsWith(SYNC_CODE_EMAIL_DOMAIN) ? null : raw;
     if (m.userId === uid) {
       if (email !== m.email) store.setSyncMeta({ email });
       return;
@@ -225,7 +207,6 @@ export function createSyncEngine(opts: {
     if (m.lastUserId !== uid) patch.cursors = createDefaultSyncMeta().cursors;
     store.setSyncMeta(patch);
     store.markAllDirty();
-    pendingEmail = null;
   }
 
   function clearTimers(): void {
@@ -484,14 +465,12 @@ export function createSyncEngine(opts: {
     }, 0);
   });
 
-  // On creation with an existing session (app open), or after a magic-link redirect: settle the
-  // session, clean the URL, and run.
+  // On creation with an existing session (app open): settle the session and run.
   void (async () => {
     try {
       const {
         data: { session },
       } = await client.auth.getSession();
-      stripAuthParams();
       if (disposed) return;
       if (session) {
         adoptSession(session);
@@ -503,7 +482,6 @@ export function createSyncEngine(opts: {
         setStatus('signed-out');
       }
     } catch {
-      stripAuthParams();
       if (!disposed && signedIn()) setStatus(deps.isOnline() ? 'error' : 'offline');
     }
   })();
@@ -536,35 +514,29 @@ export function createSyncEngine(opts: {
       };
     },
 
-    async requestCode(email) {
-      const addr = email.trim();
-      if (!EMAIL_RE.test(addr)) return { ok: false, error: 'invalid-email' };
+    async signInWithCode(raw) {
+      const derived = await deriveSyncCredentials(raw);
+      if (!derived.ok) return { ok: false, error: derived.error };
+      const { email, password } = derived.credentials;
       try {
-        const { error } = await client.auth.signInWithOtp({
-          email: addr,
-          options: { emailRedirectTo: redirectUrl(), shouldCreateUser: true },
-        });
-        if (!error) {
-          pendingEmail = addr;
-          if (!signedIn()) setStatus('code-sent');
-          return { ok: true };
+        let session: SessionLike | null = null;
+        const first = await client.auth.signInWithPassword({ email, password });
+        if (!first.error) {
+          session = first.data.session;
+        } else if (isEmailNotConfirmed(first.error)) {
+          return confirmEmailOn();
+        } else if (isInvalidCredentials(first.error)) {
+          // First use of this code anywhere: create the account.
+          const up = await client.auth.signUp({ email, password });
+          if (up.error) return { ok: false, error: mapSignInError(up.error) };
+          if (!up.data.session) return confirmEmailOn();
+          session = up.data.session;
+        } else {
+          return { ok: false, error: mapSignInError(first.error) };
         }
-        return { ok: false, error: mapRequestError(error) };
-      } catch (e) {
-        return { ok: false, error: isNetworkError(e) ? 'network' : 'unknown' };
-      }
-    },
-
-    async verifyCode(email, code) {
-      const token = code.replace(/\s+/g, '');
-      if (token.length === 0) return { ok: false, error: 'invalid-code' };
-      try {
-        const { data, error } = await client.auth.verifyOtp({ email: email.trim(), token, type: 'email' });
-        if (error) return { ok: false, error: mapVerifyError(error) };
-        if (!data.session) return { ok: false, error: 'invalid-code' };
-        pendingEmail = email.trim();
-        if (status === 'auth-expired' || status === 'code-sent' || status === 'signed-out') status = 'idle';
-        adoptSession(data.session);
+        if (!session) return { ok: false, error: 'unknown' };
+        if (status === 'auth-expired' || status === 'signed-out') status = 'idle';
+        adoptSession(session);
         void trigger();
         return { ok: true };
       } catch (e) {
@@ -584,7 +556,6 @@ export function createSyncEngine(opts: {
         dirty: createDefaultSyncMeta().dirty,
         rejected: 0,
       });
-      pendingEmail = null;
       failures = 0;
       setStatus('signed-out');
     },
@@ -604,7 +575,6 @@ export function createSyncEngine(opts: {
       clearTimers();
       store.eraseAll(deps.now()); // resets meta.sync (signs out locally) and AppData
       await removeSession();
-      pendingEmail = null;
       failures = 0;
       setStatus('signed-out');
       return { ok: true };
@@ -622,31 +592,28 @@ export function createSyncEngine(opts: {
   };
 }
 
-function mapRequestError(e: AuthErrorLike): 'invalid-email' | 'rate-limited' | 'network' | 'unknown' {
-  const code = errCode(e);
-  const status = errStatus(e);
-  if (
-    status === 429 ||
-    code === 'over_email_send_rate_limit' ||
-    code === 'over_request_rate_limit' ||
-    /rate limit/i.test(errMessage(e))
-  ) {
-    return 'rate-limited';
-  }
-  if (isNetworkError(e)) return 'network';
-  if (code === 'email_address_invalid' || code === 'validation_failed' || status === 400 || status === 422) {
-    return 'invalid-email';
-  }
-  return 'unknown';
+function confirmEmailOn(): SignInWithCodeResult {
+  return { ok: false, error: 'confirm_email_on', message: CONFIRM_EMAIL_ON_MESSAGE };
 }
 
-function mapVerifyError(e: AuthErrorLike): 'invalid-code' | 'expired' | 'network' | 'unknown' {
+function isInvalidCredentials(e: AuthErrorLike): boolean {
+  return errCode(e) === 'invalid_credentials' || /invalid login credentials/i.test(errMessage(e));
+}
+
+function isEmailNotConfirmed(e: AuthErrorLike): boolean {
+  return errCode(e) === 'email_not_confirmed' || /email not confirmed/i.test(errMessage(e));
+}
+
+function mapSignInError(e: AuthErrorLike): 'rate_limited' | 'network' | 'unknown' {
   const code = errCode(e);
-  const status = errStatus(e);
+  if (
+    errStatus(e) === 429 ||
+    code === 'over_request_rate_limit' ||
+    code === 'over_email_send_rate_limit' ||
+    /rate limit/i.test(errMessage(e))
+  ) {
+    return 'rate_limited';
+  }
   if (isNetworkError(e)) return 'network';
-  if (code === 'otp_expired' || /expired/i.test(errMessage(e))) return 'expired';
-  if (status === 429) return 'unknown';
-  if (code === 'otp_disabled' || code === 'validation_failed' || (status >= 400 && status < 500))
-    return 'invalid-code';
   return 'unknown';
 }

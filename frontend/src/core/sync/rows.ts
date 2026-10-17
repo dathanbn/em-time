@@ -1,6 +1,7 @@
 import { SYNCED_SETTINGS_KEYS } from '../constants';
 import {
   isRecord,
+  parseRemoteDisplayName,
   validateCategory,
   validateSession,
   validateSettings,
@@ -134,7 +135,12 @@ export function fromRow(
       const clean = validateSettings(row.data);
       const out: Partial<Settings> = { updatedAt: Math.floor(updatedAt) };
       for (const k of SYNCED_SETTINGS_KEYS) {
-        if (k in row.data) (out as Record<string, unknown>)[k] = clean[k];
+        if (!(k in row.data)) continue;
+        if (k === 'displayName') {
+          // an invalid pulled name is ignored (the local one stays), not replaced by the default
+          const name = parseRemoteDisplayName(row.data[k]);
+          if (name !== null) out.displayName = name;
+        } else (out as Record<string, unknown>)[k] = clean[k];
       }
       return out;
     }

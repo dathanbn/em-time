@@ -19,20 +19,10 @@ export function isSyncConfigured(env: Partial<SyncEnv>): env is SyncEnv {
   return url.startsWith('https://') || url.startsWith('http://localhost');
 }
 
-/**
- * True when a Supabase auth session was persisted on this device, or when the page was opened
- * from a magic link (?code=) and the PKCE verifier saved at sign-in is still here: the engine must
- * load to exchange that code, even though no session is stored yet.
- */
+/** True when a Supabase auth session was persisted on this device (restored on startup). */
 export function hasStoredAuth(): boolean {
   try {
-    if (typeof localStorage === 'undefined') return false;
-    if (localStorage.getItem(AUTH_STORAGE_KEY) !== null) return true;
-    return (
-      typeof location !== 'undefined' &&
-      /[?&]code=/.test(location.search) &&
-      localStorage.getItem(`${AUTH_STORAGE_KEY}-code-verifier`) !== null
-    );
+    return typeof localStorage !== 'undefined' && localStorage.getItem(AUTH_STORAGE_KEY) !== null;
   } catch {
     return false;
   }

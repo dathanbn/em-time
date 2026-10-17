@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
   AUTH_STORAGE_KEY,
   MIN,
@@ -78,8 +78,8 @@ function makeDevice(server: FakeServer, deviceId: string, clock: { now: number }
 }
 type Device = ReturnType<typeof makeDevice>;
 
-async function signIn(d: Device, email: string) {
-  const r = await d.engine.verifyCode(email, '123456');
+async function signIn(d: Device, code: string) {
+  const r = await d.engine.signInWithCode(code);
   expect(r).toEqual({ ok: true });
   await d.advance(0); // lets the deferred SIGNED_IN event handler run
   await d.engine.syncNow();
@@ -118,7 +118,7 @@ const serverRows = (server: FakeServer, table: 'categories' | 'tasks' | 'session
 ];
 
 describe('client setup', () => {
-  it('creates the client with PKCE, persisted session and the em-time:auth key', () => {
+  it('creates the client with a persisted session and the em-time:auth key', () => {
     const server = createFakeServer();
     const d = makeDevice(server, D1, { now: 1_000_000 });
     expect(d.factory.calls).toHaveLength(1);
@@ -127,10 +127,9 @@ describe('client setup', () => {
       key: ENV.anonKey,
       options: {
         auth: {
-          flowType: 'pkce',
           persistSession: true,
           autoRefreshToken: true,
-          detectSessionInUrl: true,
+          detectSessionInUrl: false,
           storageKey: AUTH_STORAGE_KEY,
         },
       },
@@ -147,7 +146,7 @@ describe('push', () => {
     const d = makeDevice(server, D1, clock);
     const task = d.store.addTask({ name: 'Orgo' });
     session(d.store, D1, clock.now - 30 * MIN, task.id);
-    await signIn(d, 'em@example.com');
+    await signIn(d, 'em-sync-code');
 
     const tasks = serverRows(server, 'tasks');
     expect(tasks).toHaveLength(1);
@@ -183,7 +182,7 @@ describe('push', () => {
     const server = createFakeServer();
     const clock = { now: 10_000_000 };
     const d = makeDevice(server, D1, clock);
-    await signIn(d, 'em@example.com');
+    await signIn(d, 'em-sync-code');
     const t = d.store.addTask({ name: 'First' });
     let release!: () => void;
     server.gate = new Promise<void>((r) => (release = r));
@@ -206,7 +205,7 @@ describe('push', () => {
     const server = createFakeServer();
     const clock = { now: 20_000_000 };
     const a = makeDevice(server, D1, clock);
-    await signIn(a, 'em@example.com');
+    await signIn(a, 'em-sync-code');
     // seeded defaults (updatedAt 0) never reach the server
     expect(serverRows(server, 'settings')).toHaveLength(0);
     clock.now += 100;
@@ -231,12 +230,15 @@ describe('push', () => {
       weekStartsOn: 0,
       breakPrompts: true,
       encouragement: true,
+      displayName: 'Em',
     });
     expect(row.data).not.toHaveProperty('theme');
+    expect(row.data).not.toHaveProperty('mascot');
+    expect(row.data).not.toHaveProperty('stickers');
 
     const b = makeDevice(server, D2, clock);
     b.store.updateSettings({ theme: 'dark', chime: 'bell' });
-    await signIn(b, 'em@example.com');
+    await signIn(b, 'em-sync-code');
     expect(b.store.get().settings).toMatchObject({
       dailyGoalMin: 90,
       autoStart: false,
@@ -264,8 +266,8 @@ describe('pull', () => {
     const t1 = a.store.addTask({ name: 'Shared' });
     clock.now += 10;
     const t2 = a.store.addTask({ name: 'Other' });
-    await signIn(a, 'em@example.com');
-    await signIn(b, 'em@example.com');
+    await signIn(a, 'em-sync-code');
+    await signIn(b, 'em-sync-code');
     expect(
       b.store
         .get()
@@ -308,7 +310,7 @@ describe('pull', () => {
   it('a tombstone beats a live row with the same updatedAt', async () => {
     const { server, clock, a } = await seeded();
     const t = a.store.addTask({ name: 'Tie' });
-    await signIn(a, 'em@example.com');
+    await signIn(a, 'em-sync-code');
     const uid = a.fc.session()!.user.id;
     const key = `${uid}|${t.id}`;
     const live = server.tables.tasks.get(key)!;
@@ -326,8 +328,8 @@ describe('pull', () => {
   it('re-reads a 60 s overlap on every pull and stays idempotent', async () => {
     const { server, clock, a, b } = await seeded();
     b.store.addTask({ name: 'From B' });
-    await signIn(b, 'em@example.com');
-    await signIn(a, 'em@example.com');
+    await signIn(b, 'em-sync-code');
+    await signIn(a, 'em-sync-code');
     const cursor = a.store.get().meta.sync.cursors.tasks!;
     expect(Date.parse(cursor)).toBeGreaterThan(0);
     const before = a.store.get().tasks.length;
@@ -357,7 +359,7 @@ describe('pull', () => {
 
   it('pages through large result sets', async () => {
     const { server, a } = await seeded();
-    await signIn(a, 'em@example.com');
+    await signIn(a, 'em-sync-code');
     const uid = a.fc.session()!.user.id;
     for (let i = 0; i < 2300; i++) {
       server.serverNow += 1;
@@ -404,8 +406,8 @@ describe('first sign-in with unsynced history on two devices (EDGE-11)', () => {
     b.store.updateSettings({ dailyGoalMin: 180 }); // later: wins
     expect(aGoal.dailyGoalMin).toBe(60);
 
-    await signIn(a, 'em@example.com');
-    await signIn(b, 'em@example.com');
+    await signIn(a, 'em-sync-code');
+    await signIn(b, 'em-sync-code');
     await a.engine.syncNow();
 
     for (const d of [a, b]) {
@@ -428,12 +430,12 @@ describe('first sign-in with unsynced history on two devices (EDGE-11)', () => {
     const clock = { now: 70_000_000 };
     const a = makeDevice(server, D1, clock);
     a.store.addTask({ name: 'Mine' });
-    await signIn(a, 'one@example.com');
+    await signIn(a, 'sync-code-one');
     expect(a.store.get().meta.sync.cursors.tasks).not.toBeNull();
     await a.engine.signOut();
     expect(a.store.get().meta.sync).toMatchObject({ userId: null, cursors: { tasks: null } });
     a.store.addTask({ name: 'Offline edit' });
-    await signIn(a, 'two@example.com');
+    await signIn(a, 'sync-code-two');
     const second = [...server.users.values()][1]!;
     const names = serverRows(server, 'tasks')
       .filter((r) => r.user_id === second)
@@ -450,7 +452,7 @@ describe('triggers and scheduling', () => {
     const server = createFakeServer();
     const clock = { now: 80_000_000 };
     const d = makeDevice(server, D1, clock);
-    await signIn(d, 'em@example.com');
+    await signIn(d, 'em-sync-code');
     server.log.length = 0;
     const upserts = () => server.log.filter((o) => o.kind === 'upsert' && o.table === 'tasks').length;
 
@@ -478,7 +480,7 @@ describe('triggers and scheduling', () => {
     const server = createFakeServer();
     const clock = { now: 90_000_000 };
     const d = makeDevice(server, D1, clock);
-    await signIn(d, 'em@example.com');
+    await signIn(d, 'em-sync-code');
     const runs = () => server.log.filter((o) => o.kind === 'getSession').length;
 
     let base = runs();
@@ -506,7 +508,7 @@ describe('triggers and scheduling', () => {
     const server = createFakeServer();
     const clock = { now: 95_000_000 };
     const d = makeDevice(server, D1, clock);
-    await signIn(d, 'em@example.com');
+    await signIn(d, 'em-sync-code');
     d.flags.online = false;
     d.store.addTask({ name: 'offline task' });
     server.log.length = 0;
@@ -527,7 +529,7 @@ describe('triggers and scheduling', () => {
     const server = createFakeServer();
     const clock = { now: 96_000_000 };
     const d = makeDevice(server, D1, clock);
-    await signIn(d, 'em@example.com');
+    await signIn(d, 'em-sync-code');
     server.gate = new Promise<void>(() => undefined); // the network never answers
     const t = d.store.addTask({ name: 'instant' });
     expect(d.store.get().tasks.find((x) => x.id === t.id)).toBeDefined();
@@ -543,7 +545,7 @@ describe('failures', () => {
     const server = createFakeServer();
     const clock = { now: 100_000_000 };
     const d = makeDevice(server, D1, clock);
-    await signIn(d, 'em@example.com');
+    await signIn(d, 'em-sync-code');
     d.store.addTask({ name: 'x' });
     server.failWhen = (op) =>
       op.kind === 'upsert' ? { message: 'upstream down', code: '', status: 503 } : null;
@@ -574,7 +576,7 @@ describe('failures', () => {
     const server = createFakeServer();
     const clock = { now: 110_000_000 };
     const d = makeDevice(server, D1, clock);
-    await signIn(d, 'em@example.com');
+    await signIn(d, 'em-sync-code');
     server.failWhen = (op) => (op.kind === 'select' ? new TypeError('Failed to fetch') : null);
     const r = await d.engine.syncNow();
     expect(r.ok).toBe(false);
@@ -586,7 +588,7 @@ describe('failures', () => {
     const server = createFakeServer();
     const clock = { now: 120_000_000 };
     const d = makeDevice(server, D1, clock);
-    await signIn(d, 'em@example.com');
+    await signIn(d, 'em-sync-code');
     d.store.addTask({ name: 'good 1' });
     d.store.addTask({ name: 'BAD' });
     d.store.addTask({ name: 'good 2' });
@@ -606,7 +608,7 @@ describe('failures', () => {
     const server = createFakeServer();
     const clock = { now: 130_000_000 };
     const d = makeDevice(server, D1, clock);
-    await signIn(d, 'em@example.com');
+    await signIn(d, 'em-sync-code');
     d.fc.setSession(null); // refresh token revoked
     d.store.addTask({ name: 'queued' });
     await d.advance(SYNC_DEBOUNCE_MS + 10);
@@ -618,7 +620,7 @@ describe('failures', () => {
     expect(server.log).toHaveLength(0); // no runs while expired
     expect((await d.engine.syncNow()).ok).toBe(false);
 
-    await signIn(d, 'em@example.com');
+    await signIn(d, 'em-sync-code');
     expect(d.engine.state()).toMatchObject({ status: 'idle', pending: 0 });
     expect(
       serverRows(server, 'tasks')
@@ -632,7 +634,7 @@ describe('failures', () => {
     const server = createFakeServer();
     const clock = { now: 140_000_000 };
     const d = makeDevice(server, D1, clock);
-    await signIn(d, 'em@example.com');
+    await signIn(d, 'em-sync-code');
     server.failWhen = (op) => (op.kind === 'select' ? { message: 'JWT expired', code: 'PGRST301' } : null);
     await d.engine.syncNow();
     expect(d.engine.state().status).toBe('auth-expired');
@@ -641,48 +643,29 @@ describe('failures', () => {
 });
 
 describe('sign-in, sign-out and erase', () => {
-  it('maps request and verify errors to the contract codes', async () => {
+  it('maps auth failures to result codes', async () => {
     const server = createFakeServer();
     const d = makeDevice(server, D1, { now: 1 });
-    expect(await d.engine.requestCode('nope')).toEqual({ ok: false, error: 'invalid-email' });
+    await d.advance(0);
+    server.log.length = 0;
+    expect(await d.engine.signInWithCode('short')).toEqual({ ok: false, error: 'code_too_short' });
+    expect(server.log).toEqual([]); // rejected before any request
     server.failWhen = () => ({
-      message: 'email rate limit exceeded',
-      code: 'over_email_send_rate_limit',
+      message: 'rate limit exceeded',
+      code: 'over_request_rate_limit',
       status: 429,
     });
-    expect(await d.engine.requestCode('em@example.com')).toEqual({ ok: false, error: 'rate-limited' });
+    expect(await d.engine.signInWithCode('em-sync-code')).toEqual({ ok: false, error: 'rate_limited' });
     server.failWhen = () => new TypeError('Failed to fetch');
-    expect(await d.engine.requestCode('em@example.com')).toEqual({ ok: false, error: 'network' });
+    expect(await d.engine.signInWithCode('em-sync-code')).toEqual({ ok: false, error: 'network' });
     server.failWhen = () => ({ message: 'boom', status: 500 });
-    expect(await d.engine.requestCode('em@example.com')).toEqual({ ok: false, error: 'unknown' });
+    expect(await d.engine.signInWithCode('em-sync-code')).toEqual({ ok: false, error: 'unknown' });
     server.failWhen = null;
-    expect(await d.engine.requestCode(' em@example.com ')).toEqual({ ok: true });
-    expect(d.engine.state()).toMatchObject({ status: 'code-sent', email: 'em@example.com' });
-
-    expect(await d.engine.verifyCode('em@example.com', '000000')).toEqual({ ok: false, error: 'expired' });
-    server.failWhen = () => ({ message: 'Token is invalid', code: 'validation_failed', status: 422 });
-    expect(await d.engine.verifyCode('em@example.com', '000000')).toEqual({
-      ok: false,
-      error: 'invalid-code',
-    });
-    server.failWhen = () => new TypeError('Failed to fetch');
-    expect(await d.engine.verifyCode('em@example.com', '123456')).toEqual({ ok: false, error: 'network' });
-    server.failWhen = null;
-    expect(await d.engine.verifyCode('em@example.com', '123456')).toEqual({ ok: true });
+    expect(await d.engine.signInWithCode('em-sync-code')).toEqual({ ok: true });
     d.engine.dispose();
   });
 
-  it('sends the magic link back to this page', async () => {
-    const server = createFakeServer();
-    const d = makeDevice(server, D1, { now: 1 });
-    const spy = vi.spyOn(d.fc.client.auth, 'signInWithOtp');
-    await d.engine.requestCode('em@example.com');
-    expect(spy.mock.calls[0]![0].options).toMatchObject({ shouldCreateUser: true });
-    expect(typeof spy.mock.calls[0]![0].options.emailRedirectTo).toBe('string');
-    d.engine.dispose();
-  });
-
-  it('completes a magic-link sign-in that arrives as an auth event', async () => {
+  it('completes a sign-in that arrives as an auth event', async () => {
     const server = createFakeServer();
     const clock = { now: 150_000_000 };
     const d = makeDevice(server, D1, clock);
@@ -702,7 +685,7 @@ describe('sign-in, sign-out and erase', () => {
     const clock = { now: 160_000_000 };
     const first = makeDevice(server, D1, clock);
     first.store.addTask({ name: 'kept' });
-    await signIn(first, 'em@example.com');
+    await signIn(first, 'em-sync-code');
     const second = createSyncEngine({
       store: first.store,
       env: ENV,
@@ -725,7 +708,7 @@ describe('sign-in, sign-out and erase', () => {
     const clock = { now: 170_000_000 };
     const d = makeDevice(server, D1, clock);
     d.store.addTask({ name: 'stays' });
-    await signIn(d, 'em@example.com');
+    await signIn(d, 'em-sync-code');
     d.store.addTask({ name: 'stays too' });
     await d.engine.signOut();
     expect(d.fc.signOutCalls).toEqual([{ scope: 'local' }]); // other devices stay signed in
@@ -752,7 +735,7 @@ describe('sign-in, sign-out and erase', () => {
     const d = makeDevice(server, D1, clock);
     const t = d.store.addTask({ name: 'gone' });
     session(d.store, D1, clock.now - 30 * MIN, t.id);
-    await signIn(d, 'em@example.com');
+    await signIn(d, 'em-sync-code');
     clock.now += 1000;
     expect(await d.engine.eraseCloud()).toEqual({ ok: true });
     for (const table of ['categories', 'tasks', 'sessions'] as const) {
@@ -771,7 +754,7 @@ describe('sign-in, sign-out and erase', () => {
     const server = createFakeServer();
     const d = makeDevice(server, D1, { now: 190_000_000 });
     d.store.addTask({ name: 'safe' });
-    await signIn(d, 'em@example.com');
+    await signIn(d, 'em-sync-code');
     d.flags.online = false;
     expect(await d.engine.eraseCloud()).toEqual({ ok: false });
     expect(d.store.get().tasks[0]!.deletedAt).toBeNull();
@@ -786,7 +769,7 @@ describe('core integration', () => {
     // device A has 12 sessions (would cross the 10-session milestone if they were "completed" here)
     const a = makeDevice(server, D1, clock);
     for (let i = 0; i < 12; i++) session(a.store, D1, clock.now - (i + 1) * 40 * MIN);
-    await signIn(a, 'em@example.com');
+    await signIn(a, 'em-sync-code');
 
     const f = fakeFactory(server);
     const core = createEmCore({
@@ -801,7 +784,7 @@ describe('core integration', () => {
     const engine = (await core.loadSync())!;
     expect(engine).not.toBeNull();
     expect(await core.loadSync()).toBe(engine); // memoized
-    await engine.verifyCode('em@example.com', '123456');
+    await engine.signInWithCode('em-sync-code');
     await engine.syncNow();
     expect(core.store.get().sessions).toHaveLength(12);
     expect(core.select.today(clock.now).sessions).toBeGreaterThan(0); // visible in stats

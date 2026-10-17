@@ -61,11 +61,9 @@ describe('hasStoredAuth', () => {
     });
     expect(hasStoredAuth()).toBe(false);
   });
-  it('is true on a magic-link return (?code= plus the saved PKCE verifier) so the code can be exchanged', () => {
+  it('ignores a ?code= return and a leftover PKCE verifier: only a stored session counts', () => {
     vi.stubGlobal('localStorage', fakeStorage({ [`${AUTH_STORAGE_KEY}-code-verifier`]: 'v' }));
     vi.stubGlobal('location', { search: '?code=abc' });
-    expect(hasStoredAuth()).toBe(true);
-    vi.stubGlobal('location', { search: '' });
     expect(hasStoredAuth()).toBe(false);
   });
 });
