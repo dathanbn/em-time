@@ -53,7 +53,7 @@ async function mockSupabase(page: Page, opts: { account: 'new' | 'existing' | 'c
       const m = mk(body.email);
       return json(200, opts.account === 'confirm' ? m.user : { ...m.session, user: m.user });
     }
-    if (url.includes('/auth/v1/user')) return json(200, mk('x@emtime.local').user);
+    if (url.includes('/auth/v1/user')) return json(200, mk('x@dathanbn.github.io').user);
     if (req.method() === 'GET') return json(200, []);
     return route.fulfill({ status: 201, headers: cors, contentType: 'application/json', body: '' });
   });
@@ -153,14 +153,14 @@ test.describe('SYNC-2 build with Supabase env set (port 4174)', () => {
     const auth = net.auth();
     expect(auth.map((c) => c.kind)).toEqual(['password', 'signup']);
     for (const c of auth) {
-      expect(c.body.email).toBe('blue-sky-morning-42@emtime.local');
+      expect(c.body.email).toBe('blue-sky-morning-42@dathanbn.github.io');
       expect(c.body.password).toMatch(/^[0-9a-f]{64}$/);
       expect(JSON.stringify(c.body)).not.toContain('Blue Sky');
     }
     expect(net.sawOtp()).toBe(false);
     // nothing derived is persisted in AppData
     const doc = JSON.stringify(await stored(page));
-    expect(doc).not.toContain('emtime.local');
+    expect(doc).not.toContain('dathanbn.github.io');
     expect(doc).not.toContain(auth[0]!.body.password);
     expect((await stored(page)).meta.sync.email ?? null).toBeNull();
     // Sign out: confirm dialog, then the form is back and the stored session is gone

@@ -22,7 +22,7 @@ test.describe('SYNC real project', () => {
   test('SYNC-3, SYNC-7, SYNC-10: two devices converge on the union; anon and other users read nothing', async ({ browser }) => {
     const admin = createClient(URL_!, SERVICE!, { auth: { persistSession: false } });
     const code = `qa e2e ${Date.now()}`;
-    const email = `${code.replace(/\s+/g, '-')}@emtime.local`;
+    const email = `${code.replace(/\s+/g, '-')}@dathanbn.github.io`;
     try {
       const device = async (name: string) => {
         const ctx = await browser.newContext({ baseURL: BASE });
