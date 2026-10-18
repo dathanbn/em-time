@@ -201,34 +201,36 @@ export function FriendsChart({ days, series, narrow }: { days: ISODay[]; series:
               style={{ '--dot': s.color } as never}
               aria-hidden="true"
             />
-            <span class="flegend__name">{s.name}</span>
+            <span class="flegend__name">{s.name}</span>{' '}
             {s.inactive ? <span class="flegend__note">(code off)</span> : null}
           </li>
         ))}
       </ul>
-      <table class="sr-only" data-testid="friends-table">
-        <caption>Focus minutes per day, last 7 days</caption>
-        <thead>
-          <tr>
-            <th scope="col">Day</th>
-            {drawn.map((s) => (
-              <th key={s.key} scope="col">
-                {s.name}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {days.map((d, i) => (
-            <tr key={d}>
-              <th scope="row">{`${formatDayLabel(d)}, ${daysAgo(i, n)}`}</th>
+      <div class="sr-only">
+        <table data-testid="friends-table">
+          <caption>Focus minutes per day, last 7 days</caption>
+          <thead>
+            <tr>
+              <th scope="col">Day</th>
               {drawn.map((s) => (
-                <td key={s.key}>{spoken(s.values[i] ?? 0)}</td>
+                <th key={s.key} scope="col">
+                  {s.name}
+                </th>
               ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {days.map((d, i) => (
+              <tr key={d}>
+                <th scope="row">{`${formatDayLabel(d)}, ${daysAgo(i, n)}`}</th>
+                {drawn.map((s) => (
+                  <td key={s.key}>{spoken(s.values[i] ?? 0)}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

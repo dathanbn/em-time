@@ -1260,6 +1260,9 @@
 .fgroup .subhead {
   margin-bottom: 0;
 }
+.fshare__more {
+  gap: 4px; /* two text buttons wrap as one unit on a phone, never one stranded on its own line */
+}
 .fcode {
   font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
   font-size: var(--em-fs-xl);

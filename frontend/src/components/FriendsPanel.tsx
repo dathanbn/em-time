@@ -110,12 +110,14 @@ function Share({ share, loaded, failed }: { share: string | null; loaded: boolea
                 Share
               </Button>
             ) : null}
-            <Button variant="text" disabled={busy} data-testid="friends-share-rotate" onClick={() => setConfirm('rotate')}>
-              New code
-            </Button>
-            <Button variant="text" disabled={busy} data-testid="friends-share-disable" onClick={() => setConfirm('disable')}>
-              Stop sharing
-            </Button>
+            <div class="btnrow fshare__more">
+              <Button variant="text" disabled={busy} data-testid="friends-share-rotate" onClick={() => setConfirm('rotate')}>
+                New code
+              </Button>
+              <Button variant="text" disabled={busy} data-testid="friends-share-disable" onClick={() => setConfirm('disable')}>
+                Stop sharing
+              </Button>
+            </div>
           </div>
         </>
       )}

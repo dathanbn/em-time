@@ -238,8 +238,8 @@ describe('friends state (app/friends.ts)', () => {
 
     it('uses the study day: before 6 AM the window still ends on the previous day', async () => {
       const { run } = await load();
-      expect(run.friendsWindow(new Date('2026-10-17T03:00:00-07:00').getTime())).toEqual({ from: '2026-10-10', to: '2026-10-16' });
-      expect(run.friendsWindow(new Date('2026-10-17T06:00:00-07:00').getTime())).toEqual({ from: '2026-10-11', to: '2026-10-17' });
+      expect(run.friendsWindow(new Date(2026, 9, 17, 3, 0).getTime())).toEqual({ from: '2026-10-10', to: '2026-10-16' });
+      expect(run.friendsWindow(new Date(2026, 9, 17, 6, 0).getTime())).toEqual({ from: '2026-10-11', to: '2026-10-17' });
     });
   });
 

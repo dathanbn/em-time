@@ -66,7 +66,7 @@ export function ChartTooltip() {
   }, []);
   if (!t) return null;
   return (
-    <div ref={ref} class="tooltip" role="presentation">
+    <div ref={ref} class="tooltip" role="presentation" aria-hidden={t.rows ? 'true' : undefined}>
       {t.rows ? (
         <>
           <div class="tooltip__label tooltip__label--head">{t.label}</div>

@@ -90,7 +90,7 @@ const cleanNickname = (raw: unknown): string | null => {
 const rpcErr = (message: string, code: string) => ({ data: null, error: { message, code } });
 const rpcOk = (data: unknown) => ({ data, error: null });
 
-function friendsRpc(
+export function friendsRpc(
   server: FakeServer,
   uid: string,
   fn: string,
