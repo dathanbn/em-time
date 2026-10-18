@@ -2,7 +2,7 @@ import { useEffect, useState } from 'preact/hooks';
 import { MIN, TREND_RANGES, formatDayLabel, formatDuration, formatRange, type TrendRange } from '@core';
 import { ExportReminder } from '../app/Banners';
 import { clockTick, core, data } from '../app/coreBridge';
-import { friends, friendsUi, loadFriendsUi, refreshFriends } from '../app/friends';
+import { friends, friendsUi, loadFriendsUi, watchFriends } from '../app/friends';
 import { plural } from '../app/selectors';
 import { GoalRing } from '../charts/GoalRing';
 import { Heatmap, heatSummary } from '../charts/Heatmap';
@@ -34,10 +34,7 @@ export function Stats() {
   useEffect(() => {
     if (!showFriends) return;
     void loadFriendsUi();
-    void refreshFriends(); // at most once a minute
-    const onShow = () => document.visibilityState === 'visible' && void refreshFriends();
-    document.addEventListener('visibilitychange', onShow);
-    return () => document.removeEventListener('visibilitychange', onShow);
+    return watchFriends(); // now, and whenever the tab comes back (at most once a minute)
   }, [showFriends]);
 
   const today = core.select.today();

@@ -1,42 +1,58 @@
 import { describe, expect, it } from 'vitest';
 import { evenX, nearestIndex, niceFriendsMax, shortMinutes } from '../../frontend/src/charts/friendsGeometry';
-import { durationTicks, thinTicks } from '../../frontend/src/charts/geometry';
+import { durationTicks } from '../../frontend/src/charts/geometry';
 
 describe('friends chart geometry (v6)', () => {
-  it('niceFriendsMax: 30-minute steps up to 2 h, whole hours above, never below 1 h', () => {
+  it('niceFriendsMax: the smallest step that needs at most 4 gridlines, and at least 2 steps', () => {
     const f = niceFriendsMax;
-    expect(f(0)).toEqual({ max: 60, step: 30 });
-    expect(f(-5)).toEqual({ max: 60, step: 30 });
-    expect(f(Number.NaN)).toEqual({ max: 60, step: 30 });
-    expect(f(1)).toEqual({ max: 60, step: 30 });
-    expect(f(45)).toEqual({ max: 60, step: 30 });
-    expect(f(61)).toEqual({ max: 90, step: 30 });
-    expect(f(90)).toEqual({ max: 90, step: 30 });
-    expect(f(119)).toEqual({ max: 120, step: 30 });
+    // small: 20 min of focus is 0 / 15m / 30m
+    expect(f(20)).toEqual({ max: 30, step: 15 });
+    expect(f(15)).toEqual({ max: 30, step: 15 });
+    expect(f(1)).toEqual({ max: 30, step: 15 });
+    expect(f(60)).toEqual({ max: 60, step: 15 }); // 4 steps of 15
+    expect(f(61)).toEqual({ max: 90, step: 30 }); // 5 steps of 15 is too many
     expect(f(120)).toEqual({ max: 120, step: 30 });
-    expect(f(121)).toEqual({ max: 180, step: 60 });
-    expect(f(180)).toEqual({ max: 180, step: 60 });
-    expect(f(181)).toEqual({ max: 240, step: 60 });
-    expect(f(600)).toEqual({ max: 600, step: 60 });
+    // mid: 2 h 50 is 0 / 1h / 2h / 3h
+    expect(f(170)).toEqual({ max: 180, step: 60 });
+    expect(f(240)).toEqual({ max: 240, step: 60 });
+    expect(f(241)).toEqual({ max: 360, step: 120 });
+    // large: 9 h is 0 / 3h / 6h / 9h
+    expect(f(540)).toEqual({ max: 540, step: 180 });
+    expect(f(270)).toEqual({ max: 360, step: 120 }); // 4 h 30
+    expect(f(720)).toEqual({ max: 720, step: 180 });
+    expect(f(1440)).toEqual({ max: 1440, step: 360 });
+    expect(f(1500)).toEqual({ max: 1800, step: 360 }); // past a day: the largest step keeps going
   });
 
-  it('the gridlines stay at 2 or 3 labelled levels above zero', () => {
-    for (const top of [0, 30, 60, 75, 120, 150, 200, 300, 480, 720]) {
+  it('niceFriendsMax: no data (or bad numbers) is 0 to 30m', () => {
+    for (const v of [0, -5, Number.NaN, Number.POSITIVE_INFINITY * 0])
+      expect(niceFriendsMax(v)).toEqual({ max: 30, step: 15 });
+  });
+
+  it('niceFriendsMax: always 2 to 4 gridlines above zero, all on whole steps, the data never above the top', () => {
+    for (let top = 0; top <= 1440; top += 7) {
       const { max, step } = niceFriendsMax(top);
-      const levels = thinTicks(durationTicks(max, step), 3).filter((t) => t > 0);
-      expect(levels.length, `max ${max}`).toBeGreaterThanOrEqual(2);
-      expect(levels.length, `max ${max}`).toBeLessThanOrEqual(3);
+      const lines = durationTicks(max, step).filter((t) => t > 0);
+      expect(lines.length, `top ${top}`).toBeGreaterThanOrEqual(2);
+      expect(lines.length, `top ${top}`).toBeLessThanOrEqual(4);
+      expect(max, `top ${top}`).toBeGreaterThanOrEqual(top);
+      expect(max % step).toBe(0);
     }
-    const lv = (top: number) => {
+    const labels = (top: number) => {
       const { max, step } = niceFriendsMax(top);
-      return thinTicks(durationTicks(max, step), 3);
+      return durationTicks(max, step).map(shortMinutes);
     };
-    expect(lv(120)).toEqual([0, 60, 120]); // 0, 1h, 2h
-    expect(lv(0)).toEqual([0, 30, 60]);
+    expect(labels(20)).toEqual(['0', '15m', '30m']);
+    expect(labels(170)).toEqual(['0', '1h', '2h', '3h']);
+    expect(labels(540)).toEqual(['0', '3h', '6h', '9h']);
+    expect(labels(0)).toEqual(['0', '15m', '30m']);
+    expect(labels(45)).toEqual(['0', '15m', '30m', '45m']);
   });
 
-  it('shortMinutes: 0, 30m, 1h, 1.5h, 2h', () => {
-    expect([0, 30, 60, 90, 120, 180, 600].map(shortMinutes)).toEqual(['0', '30m', '1h', '1.5h', '2h', '3h', '10h']);
+  it('shortMinutes: 0, 15m, 45m, 1h, 1.5h, 2h', () => {
+    expect([0, 15, 30, 45, 60, 90, 120, 180, 600].map(shortMinutes)).toEqual([
+      '0', '15m', '30m', '45m', '1h', '1.5h', '2h', '3h', '10h',
+    ]);
     expect(shortMinutes(-1)).toBe('0');
     expect(shortMinutes(45.4)).toBe('45m');
   });

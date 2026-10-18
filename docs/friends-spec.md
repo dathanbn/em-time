@@ -106,10 +106,10 @@ list: FriendWeek[]; fetchedAt: number | null }`.
 - `refreshFriends({ force? })`: needs the engine via `core.loadSync()` and a signed-in sync state; window
   is `from = addDays(todayKey(now, dayStart), -6)`, `to = today` (use the core time helpers the rest of
   the app uses for study days). Throttle to once per 60 s unless forced. Called when Stats mounts,
-  when the Settings Friends card mounts, after any friends mutation, and on `visibilitychange` to visible while Stats is open.
+  when the Settings Friends card mounts, after any friends mutation, and on `visibilitychange` to visible while Stats is open (v6.1: also by the Timer's home card, section 3.5).
 - Clear the cache on sign-out and in Erase all data (next to `clearStopwatch()`/`clearUiMemory()`).
 - Dev only: with `?stub`, serve a fixture (share `K7QP2MXD`, 3 friends: "Cathy" color 1, "Jordan" color 2,
-  one inactive "Sam" color 3, realistic minutes 0–180 per day) so the UI can be screenshotted without a
+  one inactive "Sam" color 3, realistic minutes 0–180 per day; v6.1: one day of Cathy's is 4 h 30 so the Y scale is exercised, and the Timer's home card shows in stub mode) so the UI can be screenshotted without a
   server. Keep it out of the production bundle (dynamic import behind `import.meta.env.DEV`).
 
 ### 3.2 Stats tile (`charts/FriendsChart.tsx` + tile in `screens/Stats.tsx`)
@@ -117,14 +117,22 @@ list: FriendWeek[]; fetchedAt: number | null }`.
 - Layout: phone (< 900 px): Today full width, Friends full width, then the two streak tiles side by side.
   Desktop (≥ 900 px): `1.2fr 1.2fr 1fr` columns; Today and Friends span two rows; the two streak tiles
   stack in column 3. Friends tile height equals Today's.
-- Chart (SVG, sized with the existing `useSize`): 7 points; x labels `6 5 4 3 2 1 Today` (as in Dathan's
-  sketch; the axis is "days ago", put that in the accessible name, no visible axis title in the tile);
-  y from 0 to a nice max (30 min steps under 2 h, then hours), 2–3 recessive gridlines labelled `0`,
-  `1h`, `2h` style (`formatDuration`-like short form). 2 px lines, round joins, ≥ 6 px point markers with
-  a 2 px surface ring, today's point slightly larger.
-- Series: **You** = `var(--em-ink-2)`, drawn first (underneath), dashed `4 3` so it never relies on color.
-  Friends = `var(--em-cat-<color>)` (the existing validated categorical tokens, light and dark already
-  defined). Color follows the friend (server `color`), never list position.
+- Chart (SVG, sized with the existing `useSize`): 7 days; x labels `6 5 4 3 2 1 Today` (as in Dathan's
+  sketch; the axis is "days ago", put that in the accessible name, no visible axis title in the tile).
+  **The Y axis scales to the data (v6.1).** Step = the smallest of 15, 30, 60, 120, 180, 240, 360 minutes
+  with `ceil(top / step) <= 4`; max = `max(2 * step, ceil(top / step) * step)`. So 20 min tops out at
+  0 / 15m / 30m, 2 h 50 at 0 / 1h / 2h / 3h, 9 h at 0 / 3h / 6h / 9h, and a week with no focus at all
+  at 0 / 15m / 30m (`niceFriendsMax` in `charts/friendsGeometry.ts`). Every gridline has a label
+  (`shortMinutes`: `0`, `15m`, `45m`, `1h`, `1.5h`); labels are never thinned, so the top line always has one.
+  Gridlines are recessive.
+- Lines (v6.1): each series is **one continuous smooth path** (`monotonePath` from `charts/geometry.ts`:
+  monotone cubic, no overshoot, passes through every day's value). **No point markers at rest**, and no
+  larger marker for today. While a day is active (pointer or keyboard) the crosshair shows and small dots
+  appear at that day only, one per drawn series. Round joins and caps.
+- Series: **You** = `var(--em-ink)`, 2.5 px, **solid** (no dash), drawn first (underneath); it is told
+  apart from the friends by weight and the legend, not by color alone. Friends = `var(--em-cat-<color>)`
+  (the existing validated categorical tokens, light and dark already defined), 2 px. Color follows the
+  friend (server `color`), never list position.
 - Legend under the chart: dot + name for every series ("You", then friends in list order). Name =
   nickname, else displayName, else `Friend N`. Inactive friends: legend entry with "(code off)" in muted
   ink, no line. Text uses ink tokens, never the series color.
@@ -165,9 +173,37 @@ Rendered right after `SyncCard`, only when sync is configured. Title "Friends". 
 - Every control ≥ 44×44 on phone, focus rings like the rest, axe clean in light, dark and sky.
 
 ### 3.4 Budgets
-Main JS budget is 62 KB gz with ~850 B left. Put FriendsCard and the dev fixture in lazy chunks. If the
+Main JS budget is 62 KB gz with ~850 B left (v6.1: the budget is 64 KB; the home card is its own lazy chunk). Put FriendsCard and the dev fixture in lazy chunks. If the
 Stats tile still pushes the main chunk over, lazy-load `FriendsChart` too (tile renders its frame first).
 Raising `BUDGET` is allowed up to 64 KB only with a note in HANDOFF. CSS stays under 16 KB.
+
+### 3.5 Home card (`charts/FriendsMini.tsx`, shown on the Timer; v6.1)
+
+A small version of the chart on the home screen. It is a lazy chunk of its own (`friendsMiniUi` /
+`loadFriendsMini` in `app/friends.ts`), so the Timer never loads the Settings card.
+- **When**: sync configured, signed in, and at least one friend in the list (`status` not `off` or
+  `signed-out`, `list.length >= 1`). Otherwise nothing renders: no empty state, no nag. With no friends
+  the Timer layout is exactly what it was.
+- **Content**: title "Friends" (h2) and a small "This week" caption; a compact plot (90 px tall on
+  desktop, 80 px on a phone) with the same continuous lines as the Stats chart (same series, same scale
+  rule, same colors and weights), **no axis labels and no gridlines**, only a faint baseline; under it
+  the only x hint, "6 days ago" at the left and "Today" at the right in small muted text. Then a compact
+  legend that doubles as today's standings: dot, name and today's minutes (`Cathy 1h 20m`), You first.
+  Friends whose code is off are left out here (they stay in the Stats legend). The plot is `role="img"`
+  with an `aria-label` summary like the Stats chart's. No hover or keyboard crosshair (the card is a link).
+- **Link**: the whole card is one `<a href="#/stats">` named "Friends this week, open Stats"
+  (`data-testid="friends-mini"`).
+- **Placement**: desktop (>= 900 px) a card in `aside.timerpage__side` right after the Today card.
+  Phone: after the whole timer block (greeting, modes, ring, controls, the Sounds and stopwatch row, and
+  the band that holds the message line and break card), so the timer stays the hero. The page scrolls
+  to reach it; the timer, the message band and the break card stay where they were
+  (`.timerpage--friends` keeps `.timerpage__main` at its old minimum height).
+- **Freshness**: your own line comes from local data and is reactive (a finished session moves it at
+  once). Friends' minutes are fetched when the Timer mounts, on `visibilitychange` to visible, and every
+  5 minutes while the tab is visible (`watchFriends(5 * 60_000)` in `app/friends.ts`; each ask goes through
+  the same 60 s throttle as Stats; the timer is cleared when the Timer unmounts). Not live streaming.
+- **Shared code**: `charts/friendsSeries.ts` builds the series (`buildFriendSeries`), the paths
+  (`seriesPath`), the summary text and today's standings (`standings`) for both the tile and the card.
 
 ## 4. Tests
 - Unit: `friendCode` (normalize/format, Crockford mapping), engine `friends.*` against the fake (each

@@ -6,7 +6,7 @@ import { MIN, addDays, normalizeFriendCode, type FriendWeek, type FriendsApi, ty
 export const STUB_SHARE = 'M3RV8TQB';
 
 const WEEK_MIN: Record<string, number[]> = {
-  Cathy: [95, 120, 60, 150, 85, 110, 130],
+  Cathy: [95, 120, 60, 270, 85, 110, 80], // one 4 h 30 day: the Y axis grows to 0/2h/4h/6h
   Jordan: [30, 0, 45, 80, 25, 60, 40],
 };
 

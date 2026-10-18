@@ -6,6 +6,7 @@
 import { computed, effect, signal } from '@preact/signals';
 import { isSyncConfigured, readSyncEnv, type FriendWeek, type FriendsError } from '@core';
 import type * as FriendsUi from '../components/FriendsUi';
+import type * as FriendsMiniUi from '../charts/FriendsMini';
 import { data } from './coreBridge';
 
 export type FriendsStatus = 'off' | 'signed-out' | 'loading' | 'ready' | 'error' | 'offline';
@@ -34,6 +35,12 @@ export const friendsUi = signal<typeof FriendsUi | null>(null);
 let loading: Promise<typeof FriendsUi> | null = null;
 export const loadFriendsUi = (): Promise<typeof FriendsUi> =>
   (loading ??= import('../components/FriendsUi').then((m) => (friendsUi.value = m)));
+
+/** The Timer card: its own small chunk, so the Timer never loads the Settings card. */
+export const friendsMiniUi = signal<typeof FriendsMiniUi | null>(null);
+let miniLoading: Promise<typeof FriendsMiniUi> | null = null;
+export const loadFriendsMini = (): Promise<typeof FriendsMiniUi> =>
+  (miniLoading ??= import('../charts/FriendsMini').then((m) => (friendsMiniUi.value = m)));
 
 function clearCache(): void {
   try {
@@ -81,5 +88,21 @@ export function initFriends(): void {
 export function refreshFriends(opts: { force?: boolean } = {}): Promise<void> {
   const s = friends.value.status;
   if (s === 'off' || s === 'signed-out') return Promise.resolve();
-  return loadFriendsUi().then((m) => m.refresh(opts), () => undefined);
+  return import('./friendsRun').then((m) => m.refresh(opts), () => undefined);
+}
+
+/**
+ * Keeps friends fresh while a screen that shows them is open: asks now, whenever the tab comes back
+ * to the front and, with `everyMs`, on a timer while it is visible (each ask is throttled to once a
+ * minute). Returns the cleanup.
+ */
+export function watchFriends(everyMs = 0): () => void {
+  void refreshFriends();
+  const ask = () => document.visibilityState === 'visible' && void refreshFriends();
+  document.addEventListener('visibilitychange', ask);
+  const timer = everyMs > 0 ? setInterval(ask, everyMs) : 0;
+  return () => {
+    document.removeEventListener('visibilitychange', ask);
+    if (timer) clearInterval(timer);
+  };
 }

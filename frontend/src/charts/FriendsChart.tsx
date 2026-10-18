@@ -3,40 +3,29 @@
 import { useRef, useState } from 'preact/hooks';
 import { MIN, formatDayLabel, formatDuration, type ISODay } from '@core';
 import type { FriendsState } from '../app/friends';
-import { agoText, friendName } from '../app/friendsText';
+import { agoText } from '../app/friendsText';
 import { go } from '../app/router';
 import { Button } from '../components/ui';
 import { evenX, nearestIndex, niceFriendsMax, shortMinutes } from './friendsGeometry';
-import { durationTicks, thinTicks } from './geometry';
+import {
+  FRIEND_WIDTH,
+  YOU_WIDTH,
+  buildFriendSeries,
+  seriesPath,
+  seriesSummary,
+  seriesTop,
+  spoken,
+  type FriendSeries,
+} from './friendsSeries';
+import { durationTicks } from './geometry';
 import { anchorOf, hideTip, showTip } from './Tooltip';
 import { useSize } from './useSize';
-
-export interface FriendSeries {
-  key: string;
-  name: string;
-  /** CSS color of the line and the dots (a var() token). */
-  color: string;
-  you?: boolean;
-  /** Code off: named in the legend, no line. */
-  inactive?: boolean;
-  /** Minutes for each of the 7 days, oldest first. */
-  values: number[];
-}
 
 const LEFT = 34;
 const RIGHT = 20;
 const TOP = 10;
 const AXIS = 24;
 const X_LABELS = ['6', '5', '4', '3', '2', '1', 'Today'];
-
-/** "2 h 10 min", "45 min", "0 min": for the spoken summary and the table. */
-function spoken(min: number): string {
-  const t = Math.round(min);
-  const h = Math.floor(t / 60);
-  const m = t % 60;
-  if (h === 0) return `${m} min`;
-  return m === 0 ? `${h} h` : `${h} h ${m} min`;
-}
 
 const daysAgo = (i: number, n: number): string => (i === n - 1 ? 'Today' : `${n - 1 - i} days ago`);
 
@@ -48,12 +37,11 @@ export function FriendsChart({ days, series, narrow }: { days: ISODay[]; series:
   const plotH = narrow ? 120 : 140;
   const H = TOP + plotH + AXIS;
   const drawn = series.filter((s) => !s.inactive);
-  const top = Math.max(0, ...drawn.flatMap((s) => s.values));
-  const { max, step } = niceFriendsMax(top);
+  const { max, step } = niceFriendsMax(seriesTop(series));
   const yOf = (m: number) => TOP + plotH - (Math.min(m, max) / max) * plotH;
   const plotW = Math.max(1, width - LEFT - RIGHT);
   const xOf = (i: number) => evenX(i, n, LEFT, plotW);
-  const ticks = thinTicks(durationTicks(max, step), 3);
+  const ticks = durationTicks(max, step); // every gridline is labelled
   const baseY = yOf(0);
 
   const select = (i: number | null) => {
@@ -90,9 +78,7 @@ export function FriendsChart({ days, series, narrow }: { days: ISODay[]; series:
     select(nx);
   };
 
-  const summary = series
-    .map((s) => (s.inactive ? `${s.name}, code off` : `${s.name} ${spoken(s.values.reduce((a, b) => a + b, 0))} total`))
-    .join(', ');
+  const summary = seriesSummary(series);
 
   return (
     <div class="fchart" data-testid="friends-chart">
@@ -153,30 +139,28 @@ export function FriendsChart({ days, series, narrow }: { days: ISODay[]; series:
                 key={s.key}
                 class="fseries"
                 data-series={s.key}
-                d={s.values.map((v, i) => `${i ? 'L' : 'M'}${xOf(i).toFixed(1)} ${yOf(v).toFixed(1)}`).join('')}
+                d={seriesPath(s.values, xOf, yOf)}
                 fill="none"
                 stroke={s.color}
-                stroke-width="2"
+                stroke-width={s.you ? YOU_WIDTH : FRIEND_WIDTH}
                 stroke-linejoin="round"
                 stroke-linecap="round"
-                stroke-dasharray={s.you ? '4 3' : undefined}
               />
             ))}
-            {drawn.map((s) => (
-              <g key={s.key} class="fdots" data-series={s.key} pointer-events="none">
-                {s.values.map((v, i) => (
-                  <circle
-                    key={i}
-                    cx={xOf(i)}
-                    cy={yOf(v)}
-                    r={(i === n - 1 ? 4 : 3) + (i === active ? 1 : 0)}
-                    fill={s.color}
-                    stroke="var(--em-surface-solid)"
-                    stroke-width="2"
-                  />
-                ))}
-              </g>
-            ))}
+            {active !== null
+              ? drawn.map((s) => (
+                  <g key={s.key} class="fdots" data-series={s.key} pointer-events="none">
+                    <circle
+                      cx={xOf(active)}
+                      cy={yOf(s.values[active] ?? 0)}
+                      r={4}
+                      fill={s.color}
+                      stroke="var(--em-surface-solid)"
+                      stroke-width="2"
+                    />
+                  </g>
+                ))
+              : null}
             <rect
               x={LEFT - 8}
               y={TOP - 6}
@@ -262,16 +246,7 @@ export function FriendsTileBody({
       </div>
     );
   }
-  const series: FriendSeries[] = [
-    { key: 'you', name: 'You', color: 'var(--em-ink-2)', you: true, values: you },
-    ...state.list.map((f, i) => ({
-      key: f.code,
-      name: friendName(f, i),
-      color: `var(--em-cat-${f.color})`,
-      inactive: !f.active,
-      values: days.map((d) => (f.days[d] ?? 0) / MIN),
-    })),
-  ];
+  const series = buildFriendSeries(state.list, days, you);
   const have = state.fetchedAt !== null;
   const failed = state.status === 'offline' || state.status === 'error';
   return (

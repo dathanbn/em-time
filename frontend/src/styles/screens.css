@@ -71,10 +71,11 @@
 /* Phone: greeting on top, modes at the bottom, and the ring, task, dots and controls centred in
    the space between. Fills the viewport so there is no empty band under the page. */
 .timerpage {
-  padding-top: 6px; /* with the .view padding and the safe-area inset: the greeting clears the status bar */
-  min-height: calc(
+  --timer-fill: calc(
     100dvh - var(--em-space-4) - 88px - env(safe-area-inset-top) - env(safe-area-inset-bottom)
   );
+  padding-top: 6px; /* with the .view padding and the safe-area inset: the greeting clears the status bar */
+  min-height: var(--timer-fill);
 }
 .timerpage__main {
   min-height: 100%;
@@ -1244,6 +1245,69 @@
 }
 .fchart-hold {
   height: 200px; /* the chart is a lazy chunk: keep the tile its size meanwhile */
+}
+
+/* Timer > Friends card (v6.1): the week as plain lines, the legend is today's standings. The whole card is a link to Stats. */
+a.fmini {
+  display: block;
+  color: var(--em-ink);
+  text-decoration: none;
+  transition: transform var(--em-dur-fast) ease;
+}
+a.fmini:hover {
+  transform: translateY(-1px);
+}
+a.fmini > * + * {
+  margin-top: 0;
+}
+.fmini__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.fmini__cap {
+  color: var(--em-ink-3);
+  font-size: var(--em-fs-xs);
+  font-weight: var(--em-fw-semibold);
+}
+a.fmini > .fmini__plot {
+  margin-top: 8px;
+  min-width: 0;
+}
+.fmini__svg {
+  display: block;
+}
+a.fmini > .fmini__x {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 2px;
+  color: var(--em-ink-3);
+  font-size: var(--em-fs-xs);
+  line-height: 16px;
+}
+a.fmini > .fmini__legend {
+  margin-top: 8px;
+}
+.fmini__min {
+  color: var(--em-ink);
+  font-weight: var(--em-fw-heavy);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+@media (max-width: 899px) {
+  /* Phone: the card sits under the whole timer block, which keeps filling the screen. */
+  .timerpage--friends {
+    grid-template-rows: auto auto;
+  }
+  .timerpage--friends .timerpage__main {
+    min-height: calc(var(--timer-fill) - 6px); /* what the stretched row gave it, so the timer stays where it was */
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  a.fmini:hover {
+    transform: none;
+  }
 }
 
 /* Settings > Friends */

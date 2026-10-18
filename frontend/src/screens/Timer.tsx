@@ -1,6 +1,6 @@
 import { effect } from '@preact/signals';
 import type { ComponentChildren } from 'preact';
-import { useLayoutEffect, useRef, useState } from 'preact/hooks';
+import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { MIN, ValidationError, formatClock, formatDuration, todayKey, type Phase } from '@core';
 import {
   PHASE_LABEL,
@@ -14,6 +14,7 @@ import {
   togglePlay,
 } from '../app/actions';
 import { clockTick, core, data, timerState, track } from '../app/coreBridge';
+import { friends, friendsMiniUi, loadFriendsMini, watchFriends } from '../app/friends';
 import { loadNoiseUi, noiseState, noiseUi } from '../app/noise';
 import { noiseInfo } from '../app/noiseInfo';
 import { greetingFor, type SkyCopy } from '../app/greeting';
@@ -437,6 +438,8 @@ function NoiseChip({ onOpen }: { onOpen: () => void }) {
   );
 }
 
+const FRIENDS_EVERY_MS = 5 * 60_000;
+
 export function Timer() {
   const s = timerState.value;
   const [picker, setPicker] = useState(false);
@@ -446,8 +449,21 @@ export function Timer() {
   const isBreak = s.phase !== 'focus';
   const msg = message.value;
   const prompt = breakPrompt.value;
+
+  // Friends card: only for a signed-in account with at least one friend. Friends' minutes are fetched
+  // on arrival, when the tab comes back and every 5 minutes while it is visible (all throttled).
+  const fs = friends.value;
+  const watching = fs.status !== 'off' && fs.status !== 'signed-out';
+  const showMini = watching && fs.list.length > 0;
+  const FriendsMini = friendsMiniUi.value?.FriendsMini;
+  useEffect(() => (watching ? watchFriends(FRIENDS_EVERY_MS) : undefined), [watching]);
+  useEffect(() => {
+    if (showMini) void loadFriendsMini();
+  }, [showMini]);
+  const mini = showMini && FriendsMini ? <FriendsMini narrow={narrow} /> : null;
+
   return (
-    <div class="timerpage">
+    <div class={`timerpage${mini && narrow ? ' timerpage--friends' : ''}`}>
       <h1 class="sr-only">Timer</h1>
       <div class="timerpage__main">
         <header class="thead">
@@ -497,11 +513,13 @@ export function Timer() {
           </div>
         </div>
       </div>
+      {narrow ? mini : null}
       <aside class="timerpage__side" aria-label="Today">
         <div class="card side">
           <h2 class="side__title">Today</h2>
           <TodaySummary />
         </div>
+        {narrow ? null : mini}
         <div class="card side">
           <UpNext />
         </div>

@@ -3,7 +3,7 @@ import { mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 import { createFakeServer, friendsRpc, type FakeServer } from '../../frontend/src/core/sync/fakeSupabase';
-import { atTime, boot, docWithSessions, isMobile, NOW } from './helpers';
+import { atTime, boot, controlsOverlapping, docWithSessions, isMobile, NOW, runFocus } from './helpers';
 
 /**
  * v6 friends (docs/friends-spec.md). Everything runs on the :4174 build (fake Supabase env) with
@@ -171,7 +171,7 @@ function myDoc(theme: 'light' | 'dark' | 'sky' = 'light', signedIn = true) {
 
 async function open(
   page: Page,
-  route: 'stats' | 'settings',
+  route: 'timer' | 'stats' | 'settings',
   opts: {
     signedIn?: boolean;
     theme?: 'light' | 'dark' | 'sky';
@@ -343,7 +343,7 @@ test.describe('FR-3 the chart', () => {
     await expect(paths(page)).toHaveCount(3);
   });
 
-  test('one path per active series: You first and dashed, friends in their own color, inactive has no line', async ({
+  test('one path per active series: You first, solid ink and heavier; friends in their own color; inactive has no line', async ({
     page,
   }) => {
     const info = await paths(page).evaluateAll((els) =>
@@ -356,7 +356,7 @@ test.describe('FR-3 the chart', () => {
       })),
     );
     expect(info).toEqual([
-      { key: 'you', stroke: 'var(--em-ink-2)', dash: '4 3', width: '2', join: 'round' },
+      { key: 'you', stroke: 'var(--em-ink)', dash: null, width: '2.5', join: 'round' },
       { key: CATHY, stroke: 'var(--em-cat-1)', dash: null, width: '2', join: 'round' },
       { key: JORDAN, stroke: 'var(--em-cat-2)', dash: null, width: '2', join: 'round' },
     ]);
@@ -364,41 +364,66 @@ test.describe('FR-3 the chart', () => {
     await expect(tile(page).locator(`svg [data-series="${SAM}"]`)).toHaveCount(0);
   });
 
-  test('markers: 7 per series, at least 6 px with a 2 px surface ring, today a little larger', async ({
-    page,
-  }) => {
-    for (const key of ['you', CATHY, JORDAN]) {
-      const dots = tile(page).locator(`svg g.fdots[data-series="${key}"] circle`);
-      await expect(dots).toHaveCount(7);
-      const r = await dots.evaluateAll((els) =>
-        els.map((e) => ({
-          r: Number(e.getAttribute('r')),
-          ring: e.getAttribute('stroke-width'),
-          stroke: e.getAttribute('stroke'),
-        })),
-      );
-      for (const [i, d] of r.entries()) {
-        expect(d.r * 2, `${key} dot ${i} diameter`).toBeGreaterThanOrEqual(6);
-        expect(d.ring).toBe('2');
-        expect(d.stroke).toBe('var(--em-surface-solid)');
-      }
-      expect(r[6]!.r).toBeGreaterThan(r[5]!.r);
+  test('lines are continuous: one move and only curves per path, no point markers at rest', async ({ page }) => {
+    await expect(tile(page).locator('svg circle')).toHaveCount(0);
+    await expect(tile(page).locator('svg g.fdots')).toHaveCount(0);
+    const ds = await paths(page).evaluateAll((els) => els.map((e) => e.getAttribute('d')!));
+    for (const d of ds) {
+      expect(d.match(/M/g), d).toHaveLength(1);
+      expect(d.match(/C/g), d).toHaveLength(6); // 7 days, 6 curve segments
+      expect(d).not.toMatch(/[LZ]/);
     }
+    // no dashes anywhere in the series
+    expect(await paths(page).evaluateAll((els) => els.filter((e) => e.hasAttribute('stroke-dasharray')).length)).toBe(0);
   });
 
-  test('x labels are 6 5 4 3 2 1 Today; y labels 0 and a few gridlines; no visible axis title', async ({
+  test('a path passes through every day value (the end of each curve is that day)', async ({ page }) => {
+    const info = await tile(page)
+      .locator('svg.fsvg')
+      .evaluate((svg) => {
+        const ds = [...svg.querySelectorAll('path.fseries')].map((e) => e.getAttribute('d')!);
+        const h = Number(svg.getAttribute('height'));
+        return { ds, h };
+      });
+    const you = info.ds[0]!;
+    const ends = [...you.matchAll(/([\d.]+),([\d.]+)(?=C|$)/g)].map((m) => Number(m[2]));
+    // You: 0, 25, 50, 0, 75, 0, 50 minutes... with days 8..14: Thu 0, Fri 50, Sat 25, Sun 0, Mon 75, Tue 0, Wed 50
+    expect(ends).toHaveLength(7);
+    const [y0, y1, y2, y3, y4, y5, y6] = ends as [number, number, number, number, number, number, number];
+    expect(y0).toBeCloseTo(y3, 1); // both zero
+    expect(y0).toBeCloseTo(y5, 1);
+    expect(y4).toBeLessThan(y1); // 75 min is higher on the page than 50
+    expect(y1).toBeCloseTo(y6, 1); // 50 and 50
+    expect(y2).toBeGreaterThan(y1); // 25 is lower than 50
+    expect(y2).toBeLessThan(y0);
+  });
+
+  test('hovering or focusing a day shows small dots at that day only, on every drawn series', async ({ page }, info) => {
+    test.skip(isMobile(info.project), 'keyboard');
+    await tile(page).locator('svg.fsvg').focus();
+    await expect(tile(page).locator('svg circle')).toHaveCount(3);
+    const xs = await tile(page).locator('svg circle').evaluateAll((els) => els.map((e) => e.getAttribute('cx')));
+    expect(new Set(xs).size).toBe(1);
+    await page.keyboard.press('Home');
+    const xs2 = await tile(page).locator('svg circle').evaluateAll((els) => els.map((e) => e.getAttribute('cx')));
+    expect(new Set(xs2).size).toBe(1);
+    expect(xs2[0]).not.toBe(xs[0]);
+    await page.keyboard.press('Escape');
+    await tile(page).locator('svg.fsvg').blur();
+    await expect(tile(page).locator('svg circle')).toHaveCount(0);
+  });
+
+  test('x labels are 6 5 4 3 2 1 Today; every gridline has a y label including the top one; no visible axis title', async ({
     page,
   }) => {
     const texts = await tile(page).locator('svg text').allTextContents();
     expect(texts.slice(-7)).toEqual(['6', '5', '4', '3', '2', '1', 'Today']);
     const y = texts.slice(0, -7);
-    expect(y).toContain('0');
-    expect(y.filter((t) => t !== '0').length).toBeGreaterThanOrEqual(2);
-    expect(y.filter((t) => t !== '0').length).toBeLessThanOrEqual(3);
-    for (const t of y) expect(t).toMatch(/^(0|\d+(\.\d)?[mh])$/);
     expect(texts.join(' ')).not.toMatch(/days ago/i);
-    // the data peaks at 2.5 h (Cathy, 13 Oct): gridlines in whole hours
-    expect(y).toEqual(expect.arrayContaining(['1h', '2h', '3h']));
+    // the data peaks at 2.5 h (Cathy, 13 Oct): 0 / 1h / 2h / 3h, the top gridline labelled
+    expect([...y].sort()).toEqual(['0', '1h', '2h', '3h']);
+    // one label per line: the baseline and the three gridlines
+    expect(await tile(page).locator('svg.fsvg line').count()).toBe(y.length);
   });
 
   test('legend: You, then friends in list order; name is nickname, else display name, else Friend N; code off is marked', async ({
@@ -516,7 +541,7 @@ test.describe('FR-4 color follows the friend, not the list position', () => {
     await open(page, 'stats');
     await expect(paths(page)).toHaveCount(2);
     const strokes = await paths(page).evaluateAll((els) => els.map((e) => e.getAttribute('stroke')));
-    expect(strokes).toEqual(['var(--em-ink-2)', 'var(--em-cat-2)']);
+    expect(strokes).toEqual(['var(--em-ink)', 'var(--em-cat-2)']);
     expect(await legendNames(page)).toEqual(['You', 'Jordan R.', 'Friend 2 (code off)']);
   });
 });
@@ -1237,4 +1262,461 @@ test.describe('v6 screenshots (three friends, one with the code off)', () => {
     const w = page.viewportSize()!.width;
     await page.screenshot({ path: `${SHOTS}/v6-settings-friends-${w}.png`, animations: 'disabled' });
   });
+});
+
+// ------------------------------------------------------------------------------------------- v6.1: the scale follows the data
+
+/** My document with sessions on the given days (25 minutes each), signed in. */
+function docFor(days: Array<[string, number]>, theme: 'light' | 'dark' | 'sky' = 'light') {
+  const d = docWithSessions(days, { theme, displayName: 'Em', notifications: false });
+  d.meta.sync = { ...d.meta.sync, userId: UID, lastUserId: UID };
+  return d;
+}
+const yLabels = async (p: Page) => (await tile(p).locator('svg.fsvg text').allTextContents()).slice(0, -7);
+
+test.describe('FR-10 the Y axis scales to the data', () => {
+  const two = (cathy: number[], jordan: number[]) => (s: FakeServer) => {
+    addUser(s, 'u-cathy', CATHY, 'Cathy', cathy);
+    addUser(s, 'u-jordan', JORDAN, 'Jordan R.', jordan);
+    s.links.set(UID, [
+      { code: CATHY, nickname: 'Cathy', color: 1, createdAt: 1 },
+      { code: JORDAN, nickname: 'Jordan', color: 2, createdAt: 2 },
+    ]);
+  };
+
+  test('a small week (20 min at most) is 0 / 15m / 30m', async ({ page }) => {
+    await mockBackend(page, two([10, 15, 0, 20, 5, 0, 12], [5, 0, 8, 12, 6, 9, 3]));
+    await open(page, 'stats', { seed: docFor([]) });
+    await expect(paths(page)).toHaveCount(3);
+    expect([...(await yLabels(page))].sort()).toEqual(['0', '15m', '30m']);
+  });
+
+  test('a mid week (2 h 50 at most) is 0 / 1h / 2h / 3h', async ({ page }) => {
+    await mockBackend(page, two([60, 90, 0, 170, 45, 150, 30], [20, 0, 40, 80, 25, 60, 35]));
+    await open(page, 'stats', { seed: docFor([]) });
+    await expect(paths(page)).toHaveCount(3);
+    expect([...(await yLabels(page))].sort()).toEqual(['0', '1h', '2h', '3h']);
+  });
+
+  test('a large week (9 h at most) is 0 / 3h / 6h / 9h', async ({ page }) => {
+    await mockBackend(page, two([60, 540, 0, 170, 45, 150, 30], [20, 0, 40, 80, 25, 60, 35]));
+    await open(page, 'stats', { seed: docFor([]) });
+    await expect(paths(page)).toHaveCount(3);
+    expect([...(await yLabels(page))].sort()).toEqual(['0', '3h', '6h', '9h']);
+  });
+
+  test('a week with no focus at all is 0 / 15m / 30m, and the lines lie on the baseline', async ({ page }) => {
+    await mockBackend(page, two([0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0]));
+    await open(page, 'stats', { seed: docFor([]) });
+    await expect(paths(page)).toHaveCount(3);
+    expect([...(await yLabels(page))].sort()).toEqual(['0', '15m', '30m']);
+    const ys = await paths(page).evaluateAll((els) => els.map((e) => new Set(e.getAttribute('d')!.match(/,[\d.]+/g)).size));
+    expect(ys).toEqual([1, 1, 1]);
+  });
+
+  test('the labels change when the data does (small, then a friend with 4 h 30)', async ({ page }) => {
+    const b = await mockBackend(page, two([10, 15, 0, 20, 5, 0, 12], [5, 0, 8, 12, 6, 9, 3]));
+    await open(page, 'stats', { seed: docFor([]) });
+    await expect(paths(page)).toHaveCount(3);
+    expect([...(await yLabels(page))].sort()).toEqual(['0', '15m', '30m']);
+    addUser(b.server, 'u-cathy', CATHY, 'Cathy', [10, 15, 0, 270, 5, 0, 12]);
+    await page.clock.fastForward(61_000);
+    await nav(page, 'tasks');
+    await nav(page, 'stats');
+    await expect.poll(() => yLabels(page).then((a) => [...a].sort().join(' '))).toBe('0 2h 4h 6h');
+  });
+});
+
+// ------------------------------------------------------------------------------------------- v6.1: the Timer card
+
+const mini = (p: Page) => p.getByTestId('friends-mini');
+const miniPaths = (p: Page) => mini(p).locator('svg path.fseries');
+const miniLegend = (p: Page) =>
+  mini(p)
+    .getByTestId('friends-mini-legend')
+    .locator('li')
+    .allTextContents()
+    .then((a) => a.map((t) => t.replace(/\s+/g, ' ').trim()));
+/** Makes document.visibilityState scriptable: window.__hide(true|false) fires visibilitychange. */
+const HIDEABLE = `(() => { let hidden = false; Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => (hidden ? 'hidden' : 'visible') }); window.__hide = (h) => { hidden = h; document.dispatchEvent(new Event('visibilitychange')); }; })();`;
+
+test.describe('FR-11 build without Supabase env: no Friends card on the Timer', () => {
+  test.use({ baseURL: 'http://localhost:4173/em-time/' });
+  test('nothing', async ({ page }) => {
+    const requests: string[] = [];
+    page.on('request', (r) => requests.push(r.url()));
+    await boot(page, { seed: myDoc('light', false), clock: NOW, route: 'timer', calm: true });
+    await expect(page.getByTestId('timer-play')).toBeVisible();
+    await page.waitForTimeout(300);
+    await expect(mini(page)).toHaveCount(0);
+    expect(requests.filter((u) => /friends|rpc|supabase/i.test(u))).toEqual([]);
+  });
+});
+
+test.describe('FR-12 Timer card: when it shows', () => {
+  test('signed out: no card and no request', async ({ page }) => {
+    const b = await mockBackend(page, (s) => threeFriends(s, true));
+    await open(page, 'timer', { signedIn: false });
+    await expect(page.getByTestId('timer-play')).toBeVisible();
+    await page.waitForTimeout(400);
+    await expect(mini(page)).toHaveCount(0);
+    expect(b.calls).toEqual([]);
+  });
+
+  test('signed in with no friends: no card (and no nag)', async ({ page }) => {
+    const b = await mockBackend(page);
+    await open(page, 'timer');
+    await expect.poll(() => rpcCount(b, 'em_friends_week')).toBe(1);
+    await page.waitForTimeout(400);
+    await expect(mini(page)).toHaveCount(0);
+    await expect(page.getByText('Friends', { exact: true })).toHaveCount(0);
+  });
+
+  test('signed in with friends: the card shows, on desktop and on a phone', async ({ page }) => {
+    await mockBackend(page, (s) => threeFriends(s, true));
+    await open(page, 'timer');
+    await expect(mini(page)).toBeVisible();
+    await expect(miniPaths(page)).toHaveCount(3);
+  });
+
+  test('offline with a cached friends list: the card still shows from the cache', async ({ page }) => {
+    const b = await mockBackend(page, (s) => threeFriends(s, true));
+    await open(page, 'timer');
+    await expect(mini(page)).toBeVisible();
+    await expect.poll(() => cache(page)).not.toBeNull();
+    b.fail = 'offline';
+    await page.reload();
+    await expect(mini(page)).toBeVisible();
+    await expect(miniPaths(page)).toHaveCount(3);
+  });
+
+  test('losing the last friend hides the card', async ({ page }) => {
+    const b = await mockBackend(page, (s) => threeFriends(s, true));
+    await open(page, 'timer');
+    await expect(mini(page)).toBeVisible();
+    b.server.links.set(UID, []);
+    await page.clock.fastForward(61_000);
+    await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+    await expect(mini(page)).toHaveCount(0);
+  });
+});
+
+test.describe('FR-13 Timer card: content', () => {
+  test.beforeEach(async ({ page }) => {
+    await mockBackend(page, (s) => threeFriends(s, true));
+    await open(page, 'timer');
+    await expect(miniPaths(page)).toHaveCount(3);
+  });
+
+  test('title, caption, accessible name and a link to Stats', async ({ page }) => {
+    await expect(mini(page).getByRole('heading', { name: 'Friends' })).toBeVisible();
+    await expect(mini(page)).toContainText('This week');
+    const link = page.getByRole('link', { name: 'Friends this week, open Stats' });
+    await expect(link).toHaveCount(1);
+    await expect(link).toHaveAttribute('href', '#/stats');
+    await expect(mini(page)).toHaveJSProperty('tagName', 'A');
+  });
+
+  test('plot: continuous lines only, no markers, no axis labels, no gridlines; You solid and heavier', async ({
+    page,
+  }, info) => {
+    const svg = mini(page).getByTestId('friends-mini-chart');
+    await expect(svg).toHaveAttribute('role', 'img');
+    const label = (await svg.getAttribute('aria-label'))!;
+    expect(label).toContain('Focus minutes per day, last 7 days');
+    expect(label).toContain('You 3 h 20 min total');
+    expect(label).toContain('Cathy 8 h 15 min total');
+    await expect(svg.locator('circle')).toHaveCount(0);
+    await expect(svg.locator('text')).toHaveCount(0);
+    await expect(svg.locator('line')).toHaveCount(1); // the faint baseline
+    const info2 = await miniPaths(page).evaluateAll((els) =>
+      els.map((e) => ({
+        key: e.getAttribute('data-series'),
+        stroke: e.getAttribute('stroke'),
+        dash: e.getAttribute('stroke-dasharray'),
+        width: e.getAttribute('stroke-width'),
+        moves: (e.getAttribute('d')!.match(/M/g) ?? []).length,
+        curves: (e.getAttribute('d')!.match(/C/g) ?? []).length,
+      })),
+    );
+    expect(info2).toEqual([
+      { key: 'you', stroke: 'var(--em-ink)', dash: null, width: '2.5', moves: 1, curves: 6 },
+      { key: CATHY, stroke: 'var(--em-cat-1)', dash: null, width: '2', moves: 1, curves: 6 },
+      { key: JORDAN, stroke: 'var(--em-cat-2)', dash: null, width: '2', moves: 1, curves: 6 },
+    ]);
+    const h = await svg.evaluate((e) => e.getBoundingClientRect().height);
+    expect(h).toBe(isMobile(info.project) ? 80 : 90);
+  });
+
+  test('x hints are only "6 days ago" at the left and "Today" at the right', async ({ page }) => {
+    const hint = mini(page).locator('.fmini__x span');
+    await expect(hint).toHaveText(['6 days ago', 'Today']);
+    const [a, b] = await hint.evaluateAll((els) => els.map((e) => e.getBoundingClientRect()));
+    const c = (await mini(page).boundingBox())!;
+    expect(a!.left - c.x).toBeLessThan(40);
+    expect(c.x + c.width - b!.right).toBeLessThan(40);
+    expect(b!.left).toBeGreaterThan(a!.right + 20);
+  });
+
+  test("legend is today's standings: You first, then active friends, each with today's minutes; code-off friends are left out", async ({
+    page,
+  }) => {
+    // today (Wed 14 Oct): You 50 min, Cathy 30, Jordan 35; Sam's code is off
+    expect(await miniLegend(page)).toEqual(['You 50m', 'Cathy 30m', 'Jordan 35m']);
+    await expect(mini(page)).not.toContainText('Sam');
+    await expect(mini(page)).not.toContainText('code off');
+  });
+
+  test('clicking the card opens Stats, and the card has a visible focus ring from the keyboard', async ({
+    page,
+  }, info) => {
+    if (!isMobile(info.project)) {
+      await mini(page).focus();
+      const o = await mini(page).evaluate((e) => getComputedStyle(e).outlineStyle);
+      expect(o).not.toBe('none');
+    }
+    await mini(page).click();
+    await expect(page).toHaveURL(/#\/stats$/);
+    await expect(tile(page)).toBeVisible();
+    await expect(mini(page)).toHaveCount(0);
+  });
+
+  test('the Stats chart and the card draw the same lines', async ({ page }) => {
+    const timerPaths = await miniPaths(page).evaluateAll((els) => els.map((e) => e.getAttribute('stroke')));
+    await mini(page).click();
+    await expect(paths(page)).toHaveCount(3);
+    const statsPaths = await paths(page).evaluateAll((els) => els.map((e) => e.getAttribute('stroke')));
+    expect(timerPaths).toEqual(statsPaths);
+  });
+});
+
+const PHONES = [
+  { width: 390, height: 844 },
+  { width: 360, height: 740 },
+];
+
+test.describe('FR-14 Timer card: placement', () => {
+  test('desktop: a card in the side column after Today, before Up next; same width as Today', async ({
+    page,
+  }, info) => {
+    test.skip(isMobile(info.project), 'desktop');
+    await mockBackend(page, (s) => threeFriends(s, true));
+    for (const width of [900, 1024, 1280, 1440]) {
+      await page.setViewportSize({ width, height: 900 });
+      await open(page, 'timer');
+      await expect(miniPaths(page)).toHaveCount(3);
+      const kids = await page
+        .locator('aside.timerpage__side')
+        .evaluate((el) => [...el.children].map((c) => c.getAttribute('data-testid') ?? c.querySelector('h2,h3')?.textContent));
+      expect(kids, `${width}`).toEqual(['Today', 'friends-mini', 'Up next', 'focus-tools']);
+      const [today, fm, upnext] = [
+        await box(page.locator('aside.timerpage__side > div').first()),
+        await box(mini(page)),
+        await box(page.locator('aside.timerpage__side > div').nth(2)),
+      ];
+      expect(fm.y, `${width}`).toBeGreaterThanOrEqual(today.y + today.height + 8);
+      expect(upnext.y, `${width}`).toBeGreaterThanOrEqual(fm.y + fm.height + 8);
+      expect(Math.abs(fm.width - today.width), `${width}`).toBeLessThanOrEqual(1);
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth),
+      ).toBeLessThanOrEqual(0);
+    }
+  });
+
+  for (const size of PHONES) {
+    test(`phone ${size.width}x${size.height}: the card comes after the tool row, below the whole timer block, and the timer does not move`, async ({
+      page,
+    }, info) => {
+      test.skip(!isMobile(info.project), 'phone');
+      const b = await mockBackend(page);
+      const names = ['mode-focus', 'timer-bubble', 'timer-play', 'noise-chip', 'stopwatch', 'message-line'];
+      await open(page, 'timer');
+      await page.setViewportSize(size);
+      await page.waitForTimeout(300);
+      await expect(mini(page)).toHaveCount(0);
+      const before: Record<string, { x: number; y: number; width: number; height: number }> = {};
+      for (const n of names) before[n] = await box(page.getByTestId(n));
+      const heightBefore = await page.evaluate(() => document.documentElement.scrollHeight);
+
+      threeFriends(b.server, true);
+      await page.reload();
+      await expect(mini(page)).toBeVisible();
+      await page.waitForTimeout(300);
+      for (const n of names) {
+        const a = await box(page.getByTestId(n));
+        for (const k of ['x', 'y', 'width', 'height'] as const)
+          expect(Math.abs(a[k] - before[n]![k]), `${n}.${k}`).toBeLessThanOrEqual(1);
+      }
+      const m = await box(mini(page));
+      const chip = before['noise-chip']!;
+      const sw = before['stopwatch']!;
+      expect(m.y, 'after the tool row').toBeGreaterThanOrEqual(Math.max(chip.y + chip.height, sw.y + sw.height) + 8);
+      expect(m.x).toBeGreaterThanOrEqual(8);
+      expect(m.x + m.width).toBeLessThanOrEqual(size.width - 8);
+      expect(await page.evaluate(() => document.documentElement.scrollHeight), 'the page grows by the card').toBeGreaterThan(heightBefore);
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth),
+      ).toBeLessThanOrEqual(0);
+      // it can be reached: scrolled to the end it sits fully above the tab bar
+      await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+      await page.waitForTimeout(100);
+      const nav2 = (await page.locator('.nav').first().boundingBox())!;
+      const m2 = await box(mini(page));
+      expect(m2.y + m2.height, 'above the tab bar').toBeLessThanOrEqual(nav2.y);
+      expect(m2.y, 'on screen').toBeGreaterThanOrEqual(0);
+    });
+  }
+
+  for (const size of PHONES) {
+    test(`phone ${size.width}x${size.height}: with a break card showing, the message, the break idea and the Friends card do not overlap`, async ({
+      page,
+    }, info) => {
+      test.skip(!isMobile(info.project), 'phone');
+      await mockBackend(page, (s) => threeFriends(s, true));
+      const d = docFor([['2026-10-13', 1]]);
+      d.meta.currentTaskId = d.tasks.find((t: any) => !t.deletedAt && !t.done).id;
+      await open(page, 'timer', { seed: d });
+      await page.setViewportSize(size);
+      await expect(mini(page)).toBeVisible();
+      await runFocus(page);
+      await expect(page.getByTestId('break-prompt')).toBeVisible();
+      await page.waitForTimeout(500);
+      const msg = await box(page.getByTestId('message-line'));
+      const prompt = await box(page.getByTestId('break-prompt'));
+      const m = await box(mini(page));
+      const sw = await box(page.getByTestId('stopwatch'));
+      expect(msg.y, 'message under the tool row').toBeGreaterThanOrEqual(sw.y + sw.height);
+      expect(prompt.y, 'break idea under the message').toBeGreaterThanOrEqual(msg.y + msg.height - 1);
+      expect(m.y, 'card under the break idea').toBeGreaterThanOrEqual(prompt.y + prompt.height + 4);
+      // judged at the end of the page, where the tab bar is (a phone page scrolls under it)
+      await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+      await page.waitForTimeout(100);
+      expect(
+        await controlsOverlapping(page, '[data-testid="message-line"], [data-testid="break-prompt"]'),
+      ).toEqual([]);
+      const nav2 = (await page.locator('.nav').first().boundingBox())!;
+      const m2 = await box(mini(page));
+      expect(m2.y + m2.height).toBeLessThanOrEqual(nav2.y);
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth),
+      ).toBeLessThanOrEqual(0);
+      await page.screenshot({ path: `${SHOTS}/v6-timer-break-${size.width}-scrolled.png`, animations: 'disabled' });
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await page.waitForTimeout(150);
+      await page.screenshot({ path: `${SHOTS}/v6-timer-break-${size.width}.png`, animations: 'disabled' });
+    });
+  }
+
+  test('a long friend name does not break the legend', async ({ page }, info) => {
+    await mockBackend(page, (s) => {
+      threeFriends(s, true);
+      s.links.get(UID)![0]!.nickname = 'Bartholomew-Alexander the Great';
+    });
+    if (isMobile(info.project)) await page.setViewportSize({ width: 360, height: 740 });
+    await open(page, 'timer');
+    await expect(miniPaths(page)).toHaveCount(3);
+    const m = await box(mini(page));
+    const items = await mini(page)
+      .getByTestId('friends-mini-legend')
+      .locator('li')
+      .evaluateAll((els) => els.map((e) => [e.getBoundingClientRect().left, e.getBoundingClientRect().right]));
+    for (const [l, r] of items) {
+      expect(l!).toBeGreaterThanOrEqual(m.x);
+      expect(r!).toBeLessThanOrEqual(m.x + m.width);
+    }
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth),
+    ).toBeLessThanOrEqual(0);
+  });
+});
+
+test.describe('FR-15 Timer card: freshness', () => {
+  test('your own line moves as soon as a focus session finishes', async ({ page }) => {
+    const b = await mockBackend(page, (s) => threeFriends(s, true));
+    await open(page, 'timer');
+    await expect(miniPaths(page)).toHaveCount(3);
+    expect((await miniLegend(page))[0]).toBe('You 50m');
+    const before = await miniPaths(page).first().getAttribute('d');
+    const calls = rpcCount(b, 'em_friends_week');
+    await runFocus(page);
+    await expect.poll(async () => (await miniLegend(page))[0]).toBe('You 1h 15m');
+    expect(await miniPaths(page).first().getAttribute('d')).not.toBe(before);
+    void calls;
+  });
+
+  test('friends refresh on arrival, when the tab comes back, and every 5 minutes while visible; never while hidden', async ({
+    page,
+  }) => {
+    const b = await mockBackend(page, (s) => threeFriends(s, true));
+    await open(page, 'timer', { init: HIDEABLE });
+    await expect(mini(page)).toBeVisible();
+    expect(rpcCount(b, 'em_friends_week')).toBe(1);
+    // the 5-minute timer
+    await page.clock.fastForward(5 * 60_000 + 1000);
+    await expect.poll(() => rpcCount(b, 'em_friends_week')).toBe(2);
+    // changes on the server show up with the next refresh
+    addUser(b.server, 'u-jordan', JORDAN, 'Jordan R.', [20, 0, 40, 80, 25, 60, 95]);
+    await page.clock.fastForward(5 * 60_000 + 1000);
+    await expect.poll(() => rpcCount(b, 'em_friends_week')).toBe(3);
+    await expect.poll(async () => (await miniLegend(page))[2]).toBe('Jordan 1h 35m');
+    // hidden: the timer asks nothing
+    await page.evaluate(() => (window as any).__hide(true));
+    await page.clock.fastForward(11 * 60_000);
+    await page.waitForTimeout(300);
+    expect(rpcCount(b, 'em_friends_week')).toBe(3);
+    // back to the front: one refresh, and not a second one within a minute
+    await page.evaluate(() => (window as any).__hide(false));
+    await expect.poll(() => rpcCount(b, 'em_friends_week')).toBe(4);
+    await page.evaluate(() => (window as any).__hide(false));
+    await page.waitForTimeout(300);
+    expect(rpcCount(b, 'em_friends_week')).toBe(4);
+  });
+
+  test('leaving the Timer stops the 5-minute timer', async ({ page }) => {
+    const b = await mockBackend(page, (s) => threeFriends(s, true));
+    await open(page, 'timer');
+    await expect(mini(page)).toBeVisible();
+    await nav(page, 'tasks');
+    await expect(page).toHaveURL(/#\/tasks$/);
+    const n = rpcCount(b, 'em_friends_week');
+    await page.clock.fastForward(16 * 60_000);
+    await page.waitForTimeout(300);
+    expect(rpcCount(b, 'em_friends_week')).toBe(n);
+  });
+});
+
+test.describe('FR-16 axe: Timer with the Friends card', () => {
+  for (const theme of ['light', 'dark', 'sky'] as const) {
+    test(`Timer (${theme})`, async ({ page }) => {
+      await mockBackend(page, (s) => threeFriends(s, true));
+      await open(page, 'timer', { theme });
+      await expect(miniPaths(page)).toHaveCount(3);
+      await page.waitForTimeout(500);
+      expect(await axe(page)).toEqual([]);
+    });
+  }
+});
+
+test.describe('v6.1 screenshots (Timer with the Friends card)', () => {
+  for (const [time, id] of [
+    ['12:30', 'midday'],
+    ['23:00', 'night'],
+  ] as const) {
+    test(`Timer with the Friends card (${id})`, async ({ page }, info) => {
+      await mockBackend(page, (s) => threeFriends(s, true));
+      await page.addInitScript(shiftedClock(atTime(time)));
+      await boot(page, { seed: myDoc('sky'), route: 'timer', calm: true, init: AUTH_INIT });
+      await expect(miniPaths(page)).toHaveCount(3);
+      await page.evaluate(() => document.fonts.ready);
+      await page.mouse.move(0, 0);
+      await page.waitForTimeout(500);
+      const w = page.viewportSize()!.width;
+      await page.screenshot({ path: `${SHOTS}/v6-timer-${w}-${id}.png`, animations: 'disabled' });
+      if (isMobile(info.project) && id === 'midday') {
+        await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+        await page.waitForTimeout(300);
+        await page.screenshot({ path: `${SHOTS}/v6-timer-${w}-scrolled.png`, animations: 'disabled' });
+      }
+    });
+  }
 });
