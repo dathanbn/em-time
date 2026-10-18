@@ -152,10 +152,12 @@ test.describe('Sounds placement', () => {
     await expect(side.locator('> .card')).toHaveCount(3);
     const third = side.locator('> .card').nth(2);
     await expect(third).toHaveAttribute('data-testid', 'focus-tools');
-    await expect(third.getByRole('heading', { name: 'Focus tools' })).toBeVisible();
+    // v6: one compact row, named by the group (no visible heading) so it fits under Up next at 1280x800
+    await expect(third).toHaveAttribute('role', 'group');
+    await expect(third).toHaveAccessibleName('Focus tools');
     await expect(third.getByTestId('noise-chip')).toBeVisible();
     await expect(third.getByTestId('stopwatch')).toBeVisible();
-    await expect(third).toContainText('Stopwatch');
+    await expect(third.getByTestId('stopwatch')).toHaveAccessibleName('Stopwatch');
     // order: Today, Up next, Focus tools, top to bottom
     const ys = await side.locator('> .card').evaluateAll((els) => els.map((e) => e.getBoundingClientRect().top));
     expect(ys[0]).toBeLessThan(ys[1]!);

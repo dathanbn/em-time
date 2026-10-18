@@ -293,3 +293,12 @@ Dathan reviewed the v6 screenshots. Spec: `docs/friends-spec.md` sections 3.2 (c
 **Deviations and notes.** (1) The card shows with at least one friend in the list even if all of them have their code off (it then shows only You); the spec says "at least 1 friend in the list". (2) On a 390x844 phone the top edge of the card peeks out beside and below the translucent tab bar before you scroll (the card starts at y 780 and the bar is 768 to 832), as other scrolling pages do; I did not add spacing to hide it. (3) The Y axis can have up to 5 labels (data of exactly 60 min is 0 / 15m / 30m / 45m / 1h). (4) The mini card has no hover or keyboard crosshair; it is a link. (5) `docs/architecture.md` and `docs/design.md` still say 60 KB.
 
 **Not verified.** Real devices (Safari/iOS blur and the card under the tab bar), real Supabase.
+
+## 2026-10-17, v6 final desktop polish (V6.1 layout experiment scrapped)
+
+Dathan compared a "V6.1" desktop layout (controls inside the ring) and chose to keep V6; the V6.1 branch was deleted unpushed.
+
+- Desktop side column is compact so Today, Friends, Up next and Focus tools fit in 1280x800 with no scroll: gap 12px, side cards padded 18/22px, Up next shows 3 tasks (was 6) in 34px rows at `--em-fs-sm` with a 16px radio.
+- Focus tools card is one row: Sounds chip + the same `StopwatchPill` the phone uses, styled as quiet pills on the solid card (`.side .swpill`, like `.side .nchip`). The card is `role="group"` named "Focus tools" (no visible heading). `StopwatchCard` and the stopwatch `.swatch*` rules in screens.css were removed; that `.swatch` rule also collided with the Tasks color swatch class (`components.css .swatch`) since v5, so Tasks swatches lose a stray top border/padding.
+- Timer mascot: `left: -92px` at 900 to 1199px (its painted right edge stays left of Reset at 900x700), `left: -150px; bottom: -44px` from 1200px (lower and further into the empty lower-left corner).
+- Tests: stopwatch.spec desktop assertions now match the pill (accessible names), v5.spec Focus tools card checks the group name, friends.spec adds "Focus tools fully visible at 1280x800 with friends shown". Note: e2e on :4173 serves `dist/`, so run `VITE_E2E=1 npm run build` before e2e after CSS changes or you test a stale build.

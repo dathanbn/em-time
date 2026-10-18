@@ -343,7 +343,30 @@
   pointer-events: none;
 }
 
-/* Desktop: the Focus tools card holds the Sounds chip and the labelled stopwatch. */
+/* Desktop: the Focus tools card holds the Sounds chip and the stopwatch pill on one row, as quiet
+   pills on the solid card (not glass). */
+.side--tools {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.side .swpill {
+  background: var(--em-surface-sunk);
+  border-color: var(--em-border);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: none;
+  color: var(--em-ink);
+}
+.side .swpill .iconbtn,
+.side .swpill .iconbtn:hover:not(:disabled) {
+  color: var(--em-ink);
+}
+.side .swpill[data-state='running'] {
+  background: var(--em-accent-soft);
+  box-shadow: inset 0 0 0 1.5px var(--em-accent-text);
+}
 .side .nchip {
   align-self: flex-start;
   background: var(--em-surface-sunk);
@@ -369,43 +392,6 @@
 }
 .side .nchip:focus-visible {
   box-shadow: 0 0 0 4px var(--em-focus-halo);
-}
-.swatch {
-  display: grid;
-  gap: 4px;
-  padding-top: 12px;
-  border-top: 1px solid var(--em-border);
-}
-.swatch__label {
-  color: var(--em-ink-2);
-  font-size: var(--em-fs-sm);
-  font-weight: var(--em-fw-semibold);
-}
-.swatch__row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 8px 12px;
-}
-.swatch__time {
-  font-size: var(--em-fs-xl);
-  line-height: 36px;
-  font-weight: var(--em-fw-heavy);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-.swatch__btns {
-  display: flex;
-  gap: 8px;
-}
-.swatch .btn {
-  padding: 0 16px;
-}
-.swatch .btn[aria-disabled='true'] {
-  color: var(--em-ink-3);
-  opacity: 0.6;
-  pointer-events: none;
 }
 
 /* Focus sound tiles (picker sheet) */
@@ -736,7 +722,7 @@
   }
   .timermascot {
     position: absolute;
-    left: -84px;
+    left: -92px; /* its painted right edge stays left of Reset at every desktop size */
     bottom: 24px;
   }
   .ring {
@@ -748,9 +734,37 @@
   }
   .timerpage__side {
     display: grid;
-    gap: 20px;
+    gap: 12px;
     padding-top: 12px;
   }
+  /* Compact side column: Today, Friends, Up next and Focus tools fit in 800px without scrolling. */
+  .timerpage__side > .card {
+    padding: 18px 22px;
+  }
+  .timerpage__side > .side--tools {
+    padding: 14px 22px;
+  }
+  .timerpage__side .upnext {
+    gap: 0;
+  }
+  .timerpage__side .pick {
+    min-height: 34px;
+    padding: 4px 10px;
+    gap: 10px;
+    font-size: var(--em-fs-sm);
+  }
+  .timerpage__side .pick__radio {
+    width: 16px;
+    height: 16px;
+  }
+  .timerpage__side .pick[aria-checked='true'] .pick__radio::after {
+    width: 7px;
+    height: 7px;
+  }
+  .timerpage__side .side__link {
+    margin-top: 4px;
+  }
+
   .taskbtn {
     font-size: var(--em-fs-lg);
   }
@@ -1890,5 +1904,13 @@ input[type='range'] {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+}
+
+/* Wide desktop: the cloud sits further into the empty lower-left corner, clear of the ring. */
+@media (min-width: 1200px) {
+  .timermascot {
+    left: -150px;
+    bottom: -44px;
   }
 }

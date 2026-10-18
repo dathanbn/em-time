@@ -1,6 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
-import { MIN, NOW, boot, emptyDoc, go, isMobile, setHidden, stored } from './helpers';
+import { MIN, NOW, boot, emptyDoc, go, setHidden, stored } from './helpers';
 
 /**
  * Stopwatch (v5): a barebones start/stop/reset, device-only, never part of the Pomodoro timer.
@@ -24,7 +24,7 @@ const run = (p: Page, ms: number) => p.clock.runFor(ms);
 const noDash = (t: string | null) => expect(t ?? '').not.toMatch(/[–—]/);
 
 test.describe('stopwatch: controls and display', () => {
-  test('idle: one stopwatch, zero, Start enabled, Reset disabled (aria-disabled), test ids and roles', async ({ page }, info) => {
+  test('idle: one stopwatch, zero, Start enabled, Reset disabled (aria-disabled), test ids and roles', async ({ page }) => {
     await open(page);
     await expect(sw(page)).toHaveCount(1);
     await expect(sw(page)).toHaveAttribute('data-state', 'idle');
@@ -34,20 +34,15 @@ test.describe('stopwatch: controls and display', () => {
     await expect(sw(page)).toHaveAttribute('role', 'group');
     await expect(reset(page)).toHaveAttribute('aria-disabled', 'true');
     await expect(toggle(page)).not.toHaveAttribute('aria-disabled', 'true');
-    if (isMobile(info.project)) {
-      await expect(toggle(page)).toHaveAccessibleName('Start stopwatch');
-      await expect(reset(page)).toHaveAccessibleName('Reset stopwatch');
-      await expect(toggle(page)).toHaveText('');
-    } else {
-      await expect(toggle(page)).toHaveText('Start');
-      await expect(reset(page)).toHaveText('Reset');
-      await expect(sw(page)).toContainText('Stopwatch');
-      await expect(sw(page)).toHaveAccessibleName('Stopwatch');
-    }
+    // v6: the same icon pill at every width (glass under the phone controls, quiet in the desktop Focus tools card)
+    await expect(toggle(page)).toHaveAccessibleName('Start stopwatch');
+    await expect(reset(page)).toHaveAccessibleName('Reset stopwatch');
+    await expect(toggle(page)).toHaveText('');
+    await expect(sw(page)).toHaveAccessibleName('Stopwatch');
     expect(await stored_(page)).toBeNull(); // nothing is written until it is used
   });
 
-  test('Start: the time advances; Stop holds it; Start continues from there; Reset zeroes, stops and disables', async ({ page }, info) => {
+  test('Start: the time advances; Stop holds it; Start continues from there; Reset zeroes, stops and disables', async ({ page }) => {
     await open(page);
     await toggle(page).click();
     await expect(sw(page)).toHaveAttribute('data-state', 'running');
@@ -55,16 +50,14 @@ test.describe('stopwatch: controls and display', () => {
     await expect(time(page)).toHaveText('0:05');
     await run(page, 62_000);
     await expect(time(page)).toHaveText('1:07');
-    if (isMobile(info.project)) await expect(toggle(page)).toHaveAccessibleName('Stop stopwatch');
-    else await expect(toggle(page)).toHaveText('Stop');
+    await expect(toggle(page)).toHaveAccessibleName('Stop stopwatch');
     await expect(reset(page)).not.toHaveAttribute('aria-disabled', 'true');
 
     await toggle(page).click(); // Stop
     await expect(sw(page)).toHaveAttribute('data-state', 'stopped');
     await run(page, 30_000);
     await expect(time(page)).toHaveText('1:07'); // holds
-    if (isMobile(info.project)) await expect(toggle(page)).toHaveAccessibleName('Start stopwatch');
-    else await expect(toggle(page)).toHaveText('Start');
+    await expect(toggle(page)).toHaveAccessibleName('Start stopwatch');
     expect(await stored_(page)).toEqual({ startedAt: null, accumulatedMs: 67_000 });
 
     await toggle(page).click(); // Start again: continues

@@ -1496,6 +1496,21 @@ const PHONES = [
 ];
 
 test.describe('FR-14 Timer card: placement', () => {
+  test('desktop: with friends shown, the Focus tools card (Sounds and stopwatch) is fully visible at 1280x800 without scrolling', async ({
+    page,
+  }, info) => {
+    test.skip(isMobile(info.project), 'desktop');
+    await mockBackend(page, (s) => threeFriends(s, true));
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await open(page, 'timer');
+    await expect(miniPaths(page)).toHaveCount(3);
+    const tools = await box(page.getByTestId('focus-tools'));
+    expect(tools.y + tools.height).toBeLessThanOrEqual(800);
+    await expect(page.getByTestId('focus-tools').getByTestId('noise-chip')).toBeInViewport();
+    await expect(page.getByTestId('focus-tools').getByTestId('stopwatch')).toBeInViewport();
+    expect(await page.evaluate(() => window.scrollY)).toBe(0);
+  });
+
   test('desktop: a card in the side column after Today, before Up next; same width as Today', async ({
     page,
   }, info) => {

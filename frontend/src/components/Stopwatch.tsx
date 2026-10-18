@@ -12,7 +12,6 @@ import {
 } from '../app/stopwatch';
 import { Icon } from './Icon';
 import { IconButton } from './ui';
-import { useUid } from './uid';
 
 function useFace() {
   const s = stopwatch.value;
@@ -41,41 +40,7 @@ function useFace() {
 }
 
 /** Desktop: label, digits, and real Start/Stop and Reset buttons. */
-export function StopwatchCard() {
-  const { phase, time } = useFace();
-  const label = useUid('swlabel');
-  return (
-    <div class="swatch" role="group" aria-labelledby={label} data-testid="stopwatch" data-state={phase}>
-      <div class="swatch__label" id={label}>
-        Stopwatch
-      </div>
-      <div class="swatch__row">
-        <span ref={time} class="swatch__time" role="timer" aria-live="off" data-testid="stopwatch-time" />
-        <div class="swatch__btns">
-          <button
-            type="button"
-            class="btn btn--secondary"
-            data-testid="stopwatch-toggle"
-            onClick={toggleStopwatch}
-          >
-            {phase === 'running' ? 'Stop' : 'Start'}
-          </button>
-          <button
-            type="button"
-            class="btn btn--secondary"
-            data-testid="stopwatch-reset"
-            aria-disabled={phase === 'idle' ? 'true' : undefined}
-            onClick={resetStopwatch}
-          >
-            Reset
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/** Phone: glyph, digits, and two 44px icon buttons in one clear-glass pill. */
+/** Glyph, digits, and two 44px icon buttons in one pill: clear glass under the phone controls, a quiet pill in the desktop Focus tools card. */
 export function StopwatchPill() {
   const { phase, time } = useFace();
   return (

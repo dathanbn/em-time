@@ -23,7 +23,7 @@ import { useNarrow } from '../app/useNarrow';
 import { GoalRing } from '../charts/GoalRing';
 import { Companion } from '../components/Companion';
 import { Icon } from '../components/Icon';
-import { StopwatchCard, StopwatchPill } from '../components/Stopwatch';
+import { StopwatchPill } from '../components/Stopwatch';
 import { Dialog } from '../components/Dialog';
 import { IconButton, Segmented } from '../components/ui';
 import { reducedMotion } from '../platform/env';
@@ -352,7 +352,7 @@ function TodaySummary() {
 
 function UpNext() {
   const d = data.value;
-  const tasks = openTasks(d).slice(0, 6);
+  const tasks = openTasks(d).slice(0, 3);
   const cur = d.meta.currentTaskId;
   return (
     <>
@@ -524,10 +524,9 @@ export function Timer() {
           <UpNext />
         </div>
         {narrow ? null : (
-          <div class="card side" data-testid="focus-tools">
-            <h3 class="side__h">Focus tools</h3>
+          <div class="card side side--tools" data-testid="focus-tools" role="group" aria-label="Focus tools">
             <NoiseChip onOpen={() => setSounds(true)} />
-            <StopwatchCard />
+            <StopwatchPill />
           </div>
         )}
       </aside>
