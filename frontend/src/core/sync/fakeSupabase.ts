@@ -29,7 +29,7 @@ export interface FakeServer {
   gate: Promise<void> | null;
 }
 
-export interface Op {
+interface Op {
   kind: 'upsert' | 'select' | 'getSession' | 'signInWithPassword' | 'signUp' | 'signOut' | 'rpc';
   table?: SyncTable;
   fn?: string;
