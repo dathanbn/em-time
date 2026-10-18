@@ -26,7 +26,8 @@ import type {
 } from '../api';
 import type { Category, ISODay, Session, SyncState, SyncStatus, SyncTable, Task } from '../types';
 import { diffDays, isValidDay } from '../time/calendar';
-import { FRIENDS_MAX, normalizeFriendCode } from './friendCode';
+import { normalizeFriendCode } from './friendCode';
+import { parseFriendWeek, storedFriendCode } from './friendWeek';
 import { fromRow, toRow } from './rows';
 import { deriveSyncCredentials, SYNC_CODE_EMAIL_DOMAIN, type SyncCodeError } from './syncCode';
 
@@ -164,53 +165,6 @@ const emptyCounts = (): Record<SyncTable, number> => ({ categories: 0, tasks: 0,
 
 const BAD = Symbol('bad');
 type Parsed<T> = T | typeof BAD;
-const isRecord = (v: unknown): v is Record<string, unknown> =>
-  typeof v === 'object' && v !== null && !Array.isArray(v);
-/** A stored friend code ('K7QP2MXD'): already normalized, exactly 8 characters of the alphabet. */
-const storedCode = (v: unknown): string | null => {
-  if (typeof v !== 'string') return null;
-  const n = normalizeFriendCode(v);
-  return n.ok && n.code === v ? v : null;
-};
-const clip = (v: unknown, max: number): string | null => {
-  if (typeof v !== 'string') return null;
-  const t = Array.from(v.trim()).slice(0, max).join('');
-  return t.length > 0 ? t : null;
-};
-
-/** Keeps well-formed entries, clamps minutes to >= 0 and drops days outside the asked window. */
-function parseFriendWeek(data: unknown, from: ISODay, to: ISODay): Parsed<FriendWeek[]> {
-  if (!Array.isArray(data)) return BAD;
-  const out: FriendWeek[] = [];
-  const seen = new Set<string>();
-  for (const e of data) {
-    if (!isRecord(e)) continue;
-    const code = storedCode(e.code);
-    const color = e.color;
-    if (code === null || seen.has(code)) continue;
-    if (typeof color !== 'number' || !Number.isInteger(color) || color < 1 || color > 5) continue;
-    if (typeof e.active !== 'boolean') continue;
-    const days: Record<ISODay, number> = {};
-    if (e.active && isRecord(e.days)) {
-      for (const [day, ms] of Object.entries(e.days)) {
-        if (!isValidDay(day) || day < from || day > to) continue;
-        if (typeof ms !== 'number' || !Number.isFinite(ms)) continue;
-        days[day] = Math.max(0, Math.round(ms));
-      }
-    }
-    seen.add(code);
-    out.push({
-      code,
-      nickname: clip(e.nickname, 24),
-      displayName: e.active ? clip(e.displayName, 24) : null,
-      color: color as FriendWeek['color'],
-      active: e.active,
-      days,
-    });
-    if (out.length === FRIENDS_MAX) break;
-  }
-  return out;
-}
 
 const ADD_RESULTS = new Set(['invalid', 'not_found', 'own_code', 'duplicate', 'limit']);
 
@@ -597,7 +551,7 @@ export function createSyncEngine(opts: {
     }
   }
 
-  const parseCode = (d: unknown): Parsed<string> => storedCode(d) ?? BAD;
+  const parseCode = (d: unknown): Parsed<string> => storedFriendCode(d) ?? BAD;
   const parseNothing = (): Parsed<null> => null;
 
   const friends: FriendsApi = {
@@ -630,7 +584,7 @@ export function createSyncEngine(opts: {
       if (!isValidDay(from) || !isValidDay(to) || diffDays(from, to) < 0 || diffDays(from, to) > 13) {
         return { ok: false, error: 'unknown' };
       }
-      return friendsCall('em_friends_week', { p_from: from, p_to: to }, (d) => parseFriendWeek(d, from, to));
+      return friendsCall('em_friends_week', { p_from: from, p_to: to }, (d) => parseFriendWeek(d, from, to) ?? BAD);
     },
   };
 

@@ -46,6 +46,7 @@ export type { SyncCodeError, NormalizedSyncCode, SyncCredentials } from './sync/
 export type { SignInWithCodeResult, SignInWithCodeError } from './sync/engine';
 export { FRIENDS_MAX, FRIEND_CODE_LEN, normalizeFriendCode, formatFriendCode } from './sync/friendCode';
 export type { NormalizedFriendCode } from './sync/friendCode';
+export { parseFriendWeek, storedFriendCode } from './sync/friendWeek';
 export type { FriendsApi, FriendsError, FriendAddError, FriendWeek, FriendsResult } from './sync/engine';
 
 // Additions beyond contract.md section 1 (see HANDOFF.md)

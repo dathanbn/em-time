@@ -1143,6 +1143,191 @@
   color: var(--em-ink-2);
   font-size: var(--em-fs-sm);
 }
+
+/* Friends tile (v6): Today and Friends are the same size on both layouts */
+.tiles--friends {
+  grid-template-rows: 1fr 1fr auto;
+}
+.tiles--friends > :nth-child(-n + 2) {
+  grid-column: 1 / -1;
+}
+@media (min-width: 900px) {
+  .tiles--friends {
+    grid-template-columns: 1.2fr 1.2fr 1fr;
+    grid-template-rows: auto auto;
+  }
+  .tiles--friends > :nth-child(1) {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+  }
+  .tiles--friends > :nth-child(2) {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
+  .tiles--friends > :nth-child(3) {
+    grid-column: 3;
+    grid-row: 1;
+  }
+  .tiles--friends > :nth-child(4) {
+    grid-column: 3;
+    grid-row: 2;
+  }
+}
+.fchart {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  margin-top: 4px;
+}
+.flegend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--em-ink-2);
+  font-size: var(--em-fs-xs);
+  font-weight: var(--em-fw-semibold);
+  line-height: 18px;
+}
+.flegend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+}
+.flegend__dot,
+.fdot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--dot);
+}
+.flegend__dot--off {
+  background: transparent;
+  box-shadow: inset 0 0 0 2px var(--dot);
+  opacity: 0.6;
+}
+.flegend__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.flegend__note {
+  flex: none;
+  color: var(--em-ink-3);
+  font-weight: var(--em-fw-regular);
+}
+.ftile__empty,
+.ftile__add {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+.ftile__empty {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  margin-top: 4px;
+}
+.ftile__text {
+  color: var(--em-ink-2);
+  font-size: var(--em-fs-sm);
+}
+.fsvg {
+  touch-action: pan-y;
+}
+.fchart-hold {
+  height: 200px; /* the chart is a lazy chunk: keep the tile its size meanwhile */
+}
+
+/* Settings > Friends */
+.fshare,
+.fgroup {
+  display: grid;
+  gap: 10px;
+}
+.fgroup {
+  padding-top: 12px;
+  border-top: 1px solid var(--em-border);
+}
+.fshare .subhead,
+.fgroup .subhead {
+  margin-bottom: 0;
+}
+.fcode {
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: var(--em-fs-xl);
+  line-height: 40px;
+  font-weight: var(--em-fw-heavy);
+  letter-spacing: 0.08em;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.frows {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.frow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+}
+.frow + .frow {
+  border-top: 1px solid var(--em-border);
+}
+.frow__text {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 10px;
+  min-width: 0;
+}
+.frow__name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: var(--em-fw-semibold);
+}
+.frow__code {
+  color: var(--em-ink-3);
+  font-size: var(--em-fs-xs);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+}
+.fbadge {
+  white-space: nowrap;
+  padding: 0 8px;
+  border-radius: var(--em-radius-pill);
+  background: var(--em-surface-sunk);
+  border: 1px solid var(--em-border);
+  color: var(--em-ink-2);
+  font-size: var(--em-fs-xs);
+  font-weight: var(--em-fw-semibold);
+  line-height: 18px;
+}
+.fadd {
+  display: grid;
+  gap: 10px;
+  margin-top: 8px;
+}
+.fadd__code {
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.fadd__code::placeholder {
+  text-transform: none;
+}
 .section {
   display: grid;
   gap: 12px;

@@ -22,6 +22,7 @@ import { ExportReminder, exportBackup } from '../app/Banners';
 import { breakPrompt, message } from '../app/actions';
 import { loadNoiseUi, noiseUi } from '../app/noise';
 import { core, data } from '../app/coreBridge';
+import { clearFriends, friends, friendsUi, loadFriendsUi } from '../app/friends';
 import { clearStopwatch } from '../app/stopwatch';
 import { useNarrow } from '../app/useNarrow';
 import { Companion } from '../components/Companion';
@@ -538,6 +539,7 @@ function EraseFlow() {
         core.store.eraseAll(Date.now());
         clearUiMemory();
         clearStopwatch();
+        clearFriends();
       }
       core.timer.adopt(core.store.get().timer);
       message.value = null;
@@ -663,7 +665,12 @@ export function ShortcutsList() {
 export function Settings() {
   const s = data.value.settings;
   const Noise = noiseUi.value?.NoiseSettings;
+  const FriendsCard = friendsUi.value?.FriendsCard;
   useEffect(loadNoiseUi, []);
+  const friendsOn = friends.value.status !== 'off';
+  useEffect(() => {
+    if (friendsOn) void loadFriendsUi();
+  }, [friendsOn]);
   const syncOn = isSyncConfigured(readSyncEnv());
   const narrow = useNarrow();
   return (
@@ -685,6 +692,7 @@ export function Settings() {
         <MessagesCard s={s} />
         <AppearanceCard s={s} />
         {syncOn ? <SyncCard /> : null}
+        {friendsOn && FriendsCard ? <FriendsCard /> : null}
         <DataCard />
         <Card title="About">
           <p class="about__ver">Em Time {__APP_VERSION__}</p>

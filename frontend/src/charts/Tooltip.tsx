@@ -2,12 +2,20 @@
 import { signal } from '@preact/signals';
 import { useLayoutEffect, useEffect, useRef } from 'preact/hooks';
 
+export interface TipRow {
+  name: string;
+  value: string;
+  /** CSS color of the dot in front of the name (a swatch only; the text stays in ink). */
+  dot: string;
+}
 interface Tip {
   x: number;
   y: number;
   value: string;
   label: string;
   extra?: string;
+  /** Several series at once (friends chart): the label is the heading, `value` is not shown. */
+  rows?: TipRow[];
 }
 const tip = signal<Tip | null>(null);
 
@@ -59,9 +67,26 @@ export function ChartTooltip() {
   if (!t) return null;
   return (
     <div ref={ref} class="tooltip" role="presentation">
-      <div class="tooltip__value">{t.value}</div>
-      {t.extra ? <div class="tooltip__extra">{t.extra}</div> : null}
-      <div class="tooltip__label">{t.label}</div>
+      {t.rows ? (
+        <>
+          <div class="tooltip__label tooltip__label--head">{t.label}</div>
+          <ul class="tooltip__rows">
+            {t.rows.map((r, i) => (
+              <li key={i}>
+                <span class="tooltip__dot" style={{ background: r.dot }} />
+                <span class="tooltip__name">{r.name}</span>
+                <span class="tooltip__num">{r.value}</span>
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : (
+        <>
+          <div class="tooltip__value">{t.value}</div>
+          {t.extra ? <div class="tooltip__extra">{t.extra}</div> : null}
+          <div class="tooltip__label">{t.label}</div>
+        </>
+      )}
     </div>
   );
 }

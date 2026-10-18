@@ -8,6 +8,7 @@ import { createEmCore, type Copy, type EmCore } from '@core';
 import messages from './data/messages.json';
 import { App } from './app/App';
 import { initPhaseEffects } from './app/actions';
+import { initFriends } from './app/friends';
 import { initNoise } from './app/noise';
 import { initBridge, core, timerState } from './app/coreBridge';
 import { initRouter } from './app/router';
@@ -39,6 +40,7 @@ async function boot(): Promise<void> {
   initRouter();
   initPhaseEffects();
   initNoise();
+  initFriends();
   initTitle();
   initWakeLock();
   startSky(

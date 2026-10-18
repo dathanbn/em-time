@@ -1,11 +1,11 @@
 // Fails the build when the initial JS (the entry chunk and everything it imports eagerly)
-// exceeds the budget from docs/architecture.md section 1 (60 KB, raised to 62 KB in v5): gzipped. Also reports the lazy
+// exceeds the budget from docs/architecture.md section 1 (60 KB, raised to 62 KB in v5 and 64 KB in v6): gzipped. Also reports the lazy
 // sync chunk and CSS.
 import { readFileSync, readdirSync } from 'node:fs';
 import { gzipSync } from 'node:zlib';
 import { join } from 'node:path';
 
-const BUDGET = 62 * 1024; // raised from 60 KB for the v5 stopwatch and glass (docs/v5-spec.md section 5)
+const BUDGET = 64 * 1024; // 60 KB, then 62 KB for the v5 stopwatch and glass, 64 KB for v6 friends (docs/friends-spec.md section 3.4)
 const CSS_BUDGET = 16 * 1024; // raised from 12 KB for the sky scene, mascot and glass styles (design.md 11)
 const dist = new URL('../dist/', import.meta.url).pathname;
 const html = readFileSync(join(dist, 'index.html'), 'utf8');

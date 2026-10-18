@@ -1,7 +1,8 @@
-import { useState } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
 import { MIN, TREND_RANGES, formatDayLabel, formatDuration, formatRange, type TrendRange } from '@core';
 import { ExportReminder } from '../app/Banners';
 import { clockTick, core, data } from '../app/coreBridge';
+import { friends, friendsUi, loadFriendsUi, refreshFriends } from '../app/friends';
 import { plural } from '../app/selectors';
 import { GoalRing } from '../charts/GoalRing';
 import { Heatmap, heatSummary } from '../charts/Heatmap';
@@ -25,12 +26,27 @@ export function Stats() {
   const [weekTable, setWeekTable] = useState(false);
   const [heatTable, setHeatTable] = useState(false);
   const [trendTable, setTrendTable] = useState(false);
+  const fstate = friends.value;
+  const showFriends = fstate.status !== 'off';
+  const FriendsBody = friendsUi.value?.FriendsTileBody;
+
+  // Friends: ask on arrival and whenever the tab comes back to the front (the call itself is throttled).
+  useEffect(() => {
+    if (!showFriends) return;
+    void loadFriendsUi();
+    void refreshFriends(); // at most once a minute
+    const onShow = () => document.visibilityState === 'visible' && void refreshFriends();
+    document.addEventListener('visibilitychange', onShow);
+    return () => document.removeEventListener('visibilitychange', onShow);
+  }, [showFriends]);
 
   const today = core.select.today();
   const streak = core.select.streak();
   const week = core.select.week(offset);
   const cells = core.select.heatmap();
   const trend = core.select.trend(range);
+  const weekPts = showFriends ? core.select.trend(30).slice(-7) : [];
+  const weekDays = weekPts.map((p) => p.day);
   const hs = heatSummary(cells);
   const hasSessions = d.sessions.some((s) => s.deletedAt === null);
   const goalMin = d.settings.dailyGoalMin;
@@ -45,13 +61,28 @@ export function Stats() {
       </div>
       <ExportReminder />
 
-      <div class="tiles">
+      <div class={`tiles${showFriends ? ' tiles--friends' : ''}`}>
         <StatTile label="Today" testid="today-tile">
           <div class="tile__ring">
             <GoalRing summary={today} size={120} />
             <p class="tile__ringtext">{plural(today.sessions, 'session')} today</p>
           </div>
         </StatTile>
+        {showFriends ? (
+          <StatTile label="Friends" testid="friends-tile">
+            {FriendsBody ? (
+              <FriendsBody
+                state={fstate}
+                days={weekDays}
+                you={weekDays.map((day) => weekPts.find((p) => p.day === day)?.valueMin ?? 0)}
+                narrow={narrow}
+                now={Date.now()}
+              />
+            ) : (
+              <div class="fchart-hold" aria-hidden="true" />
+            )}
+          </StatTile>
+        ) : null}
         <StatTile
           label="Current streak"
           value={dayWord(streak.current)}

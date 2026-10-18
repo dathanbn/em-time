@@ -912,6 +912,43 @@
   line-height: 18px;
   color: var(--em-ink-3);
 }
+.tooltip__label--head {
+  color: var(--em-ink-2);
+  font-weight: var(--em-fw-semibold);
+}
+.tooltip__rows {
+  display: grid;
+  gap: 2px;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.tooltip__rows li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--em-fs-sm);
+  line-height: 20px;
+  color: var(--em-ink);
+}
+.tooltip__dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.tooltip__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tooltip__num {
+  flex: none;
+  font-weight: var(--em-fw-heavy);
+  font-variant-numeric: tabular-nums;
+}
 
 /* chart tables */
 .ctable-wrap {
