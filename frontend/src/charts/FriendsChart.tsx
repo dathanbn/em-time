@@ -7,7 +7,7 @@ import { agoText, friendName } from '../app/friendsText';
 import { go } from '../app/router';
 import { Button } from '../components/ui';
 import { evenX, nearestIndex, niceFriendsMax, shortMinutes } from './friendsGeometry';
-import { durationTicks, monotonePath, thinTicks } from './geometry';
+import { durationTicks, thinTicks } from './geometry';
 import { anchorOf, hideTip, showTip } from './Tooltip';
 import { useSize } from './useSize';
 
@@ -153,7 +153,7 @@ export function FriendsChart({ days, series, narrow }: { days: ISODay[]; series:
                 key={s.key}
                 class="fseries"
                 data-series={s.key}
-                d={monotonePath(s.values.map((v, i) => ({ x: xOf(i), y: yOf(v) })))}
+                d={s.values.map((v, i) => `${i ? 'L' : 'M'}${xOf(i).toFixed(1)} ${yOf(v).toFixed(1)}`).join('')}
                 fill="none"
                 stroke={s.color}
                 stroke-width="2"

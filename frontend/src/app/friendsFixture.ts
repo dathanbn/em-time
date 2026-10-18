@@ -3,7 +3,7 @@
 // is never part of a production build.
 import { MIN, addDays, normalizeFriendCode, type FriendWeek, type FriendsApi, type ISODay } from '@core';
 
-export const STUB_SHARE = 'K7QP2MXD';
+export const STUB_SHARE = 'M3RV8TQB';
 
 const WEEK_MIN: Record<string, number[]> = {
   Cathy: [95, 120, 60, 150, 85, 110, 130],
