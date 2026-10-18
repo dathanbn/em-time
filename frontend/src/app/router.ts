@@ -20,7 +20,3 @@ export function initRouter(): void {
     window.scrollTo(0, 0);
   });
 }
-
-export function go(r: Route): void {
-  location.hash = `#/${r}`;
-}

@@ -87,9 +87,6 @@
   --em-danger: #b42318;
   --em-danger-soft: rgba(253, 236, 234, 0.95);
 
-  /* nav while a focus phase runs: muted ink on glass */
-  --em-nav-muted: #475569;
-
   /* chart chrome */
   --em-grid: #e6edf5;
   --em-axis: #c9d5e3;
@@ -229,8 +226,6 @@
 
   --em-danger: #f4a6a0;
   --em-danger-soft: rgba(58, 30, 36, 0.92);
-
-  --em-nav-muted: #a9b8cc;
 
   --em-grid: #1e2a3d;
   --em-axis: #2e3d55;

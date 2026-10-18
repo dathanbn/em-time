@@ -30,7 +30,7 @@ function errorText(e: unknown, what: 'task' | 'category'): string {
   throw e;
 }
 
-export function Swatch({ slot, size = 10 }: { slot: number; size?: number }) {
+function Swatch({ slot, size = 10 }: { slot: number; size?: number }) {
   return (
     <span
       class="swatch"

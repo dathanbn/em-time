@@ -33,7 +33,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const INT32_MAX = 2_147_483_647;
 
 export const isRecord = (x: unknown): x is Rec => typeof x === 'object' && x !== null && !Array.isArray(x);
-export const isUuid = (x: unknown): x is string => typeof x === 'string' && UUID_RE.test(x);
+const isUuid = (x: unknown): x is string => typeof x === 'string' && UUID_RE.test(x);
 const isNum = (x: unknown): x is number => typeof x === 'number' && Number.isFinite(x);
 const isMs = (x: unknown): x is number => isNum(x) && x >= 0 && Number.isSafeInteger(Math.floor(x));
 const isInt = (x: unknown): x is number => isNum(x) && Number.isInteger(x);
@@ -117,7 +117,7 @@ export function sanitizeDisplayName(raw: string): string {
 }
 
 /** Local load/import rule (V2.3): sanitize, then cut to 24 code points. Non-string gives null. */
-export function normalizeDisplayName(x: unknown): string | null {
+function normalizeDisplayName(x: unknown): string | null {
   if (typeof x !== 'string') return null;
   const s = sanitizeDisplayName(x);
   const points = Array.from(s);
@@ -178,7 +178,7 @@ export function validateSettings(x: unknown): Settings {
 }
 
 /** A stored timer that does not make sense is replaced by a fresh idle focus phase. */
-export function validateTimer(x: unknown, cfg: TimerConfig, now: number): TimerState {
+function validateTimer(x: unknown, cfg: TimerConfig, now: number): TimerState {
   const fresh = initialTimerState(cfg, now);
   if (!isRecord(x)) return fresh;
   const phase = x.phase;
@@ -257,7 +257,7 @@ function validateSyncMeta(x: unknown): SyncMeta {
   };
 }
 
-export function validateMeta(x: unknown, now: number): Meta {
+function validateMeta(x: unknown, now: number): Meta {
   const d = createDefaultMeta(now);
   if (!isRecord(x)) return d;
   const numOrNull = (v: unknown) => (isMs(v) ? v : null);

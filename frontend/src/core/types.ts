@@ -209,7 +209,6 @@ export interface PhaseCompleteEvent {  // emitted only when a phase reaches 00:0
 export type SyncStatus =
   | 'disabled'      // env missing
   | 'signed-out'
-  | 'code-sent'     // waiting for link or code
   | 'idle'          // signed in, nothing pending
   | 'syncing'
   | 'offline'

@@ -13,7 +13,7 @@ export async function requestPermission(): Promise<NotificationPermission | 'uns
   }
 }
 
-export function phaseEndContent(ended: Phase, next: Phase): { title: string; body: string } {
+function phaseEndContent(ended: Phase, next: Phase): { title: string; body: string } {
   if (ended === 'focus') {
     return {
       title: 'Focus done',

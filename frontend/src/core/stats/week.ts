@@ -3,7 +3,7 @@ import { addDays, weekStart } from '../time/calendar';
 import type { Category, CategoryColorSlot, ISODay, Session, Task, TaskTotal, WeekSummary } from '../types';
 import { dailyStats, firstSessionDay } from './daily';
 
-export const OTHER_TASKS_ID = '__other__';
+const OTHER_TASKS_ID = '__other__';
 
 interface Acc {
   key: string;

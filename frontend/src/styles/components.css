@@ -1,5 +1,4 @@
 /* ---- glass and polarity cross-fade ---- */
-.glass,
 .card,
 .seg,
 .chip,
@@ -19,7 +18,6 @@
     color var(--em-dur-flip) ease,
     border-color var(--em-dur-flip) ease;
 }
-.glass,
 .seg,
 .chip,
 .nav__tabs,

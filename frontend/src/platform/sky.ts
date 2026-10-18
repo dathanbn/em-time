@@ -118,7 +118,7 @@ export const SKY_KEYFRAMES: readonly SkyKeyframe[] = [
 export const POLARITY_FLIP_MIN = { toLight: 315, toDark: 1020 } as const;
 export const SKY_INK = { dark: '#10263F', light: '#FFFFFF' } as const;
 /** Label ink on clear glass (v5): navy, or the near-white of the dark theme. */
-export const GLASS_INK = { navy: '#10263F', white: '#EEF5FF' } as const;
+const GLASS_INK = { navy: '#10263F', white: '#EEF5FF' } as const;
 
 /** Pinned clocks for the fixed theme modes: 12:30 and 02:30. */
 const PIN_LIGHT = 750;
@@ -476,17 +476,11 @@ export function applySky(state: SkyState, root: HTMLElement = document.documentE
 
 let currentMode: () => ThemeId = () => 'sky';
 let onState: ((s: SkyState) => void) | undefined;
-let lastState: SkyState | null = null;
-
-export function currentSky(): SkyState | null {
-  return lastState;
-}
 
 /** Recompute and write right now (after a theme change, a visibility change or a resize). */
 export function refreshSky(): void {
   const mode = currentMode();
   const state = skyFor(mode, new Date());
-  lastState = state;
   document.documentElement.dataset.themeMode = mode;
   applySky(state);
   onState?.(state);

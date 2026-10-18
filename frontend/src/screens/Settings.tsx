@@ -35,7 +35,7 @@ import { clearUiMemory } from '../platform/uiMemory';
 import { wakeLockSupported } from '../platform/wakeLock';
 import { SyncCard } from './SyncCard';
 
-export const SHORTCUTS: [string, string][] = [
+const SHORTCUTS: [string, string][] = [
   ['Space', 'Start, pause or resume'],
   ['S', 'Skip to the next phase'],
   ['R', 'Reset the current phase'],

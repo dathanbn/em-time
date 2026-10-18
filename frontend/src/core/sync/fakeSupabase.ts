@@ -194,7 +194,7 @@ export interface FakeClient {
   signOutCalls: Array<{ scope?: string } | undefined>;
 }
 
-export function createFakeClient(server: FakeServer): FakeClient {
+function createFakeClient(server: FakeServer): FakeClient {
   let session: SessionLike | null = null;
   const listeners = new Set<(event: string, s: SessionLike | null) => void>();
   const signOutCalls: FakeClient['signOutCalls'] = [];

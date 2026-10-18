@@ -6,7 +6,7 @@ import { announceRemaining } from './announce';
 
 const PHASE_NAMES = { focus: 'Focus', short: 'Short break', long: 'Long break' } as const;
 
-export function titleFor(): string {
+function titleFor(): string {
   const s = timerState.value;
   if (s.status === 'idle') return 'Em Time';
   const clock = formatClock(core.timer.remainingMs());
