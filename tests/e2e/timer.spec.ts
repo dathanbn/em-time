@@ -58,7 +58,7 @@ test.describe('timer basics', () => {
     await page.clock.runFor(2500);
     await expect(digits(page)).toHaveText(frozen!);
     expect(await page.locator('.ring__arc').getAttribute('stroke-dasharray')).toBe(dash);
-    await expect(page).toHaveTitle(`Paused ${frozen} · Em Time`);
+    await expect(page).toHaveTitle(`Paused ${frozen} · Focus`);
     await play(page).click(); // resume
     await page.clock.fastForward(20 * MIN);
     await page.clock.runFor(1_000);
@@ -217,24 +217,24 @@ test.describe('tab title (TMR-14)', () => {
     await expect(page).toHaveTitle('Em Time');
     await play(page).click();
     await page.clock.runFor(1500);
-    await expect(page).toHaveTitle(/^24:5\d · Focus · Em Time$/);
+    await expect(page).toHaveTitle(/^24:5\d · Focus$/);
     await page.clock.fastForward(2 * MIN);
     await page.clock.runFor(1100);
-    await expect(page).toHaveTitle(/^22:\d\d · Focus · Em Time$/);
+    await expect(page).toHaveTitle(/^22:\d\d · Focus$/);
     await setHidden(page, true);
     await page.clock.fastForward(3 * MIN);
     await page.clock.runFor(1100);
-    await expect(page).toHaveTitle(/^19:\d\d · Focus · Em Time$/); // refreshed while hidden
+    await expect(page).toHaveTitle(/^19:\d\d · Focus$/); // refreshed while hidden
     await setHidden(page, false);
     await play(page).click();
-    await expect(page).toHaveTitle(/^Paused 19:\d\d · Em Time$/);
+    await expect(page).toHaveTitle(/^Paused 19:\d\d · Focus$/);
     await play(page).click();
     await page.clock.fastForward(15 * MIN);
     await page.clock.runFor(1000);
-    await expect(page).toHaveTitle(/^4:\d\d · Focus · Em Time$/);
+    await expect(page).toHaveTitle(/^4:\d\d · Focus$/);
     await page.clock.fastForward(5 * MIN);
     await page.clock.runFor(1100);
-    await expect(page).toHaveTitle(/^\d:\d\d · Short break · Em Time$/);
+    await expect(page).toHaveTitle(/^\d:\d\d · Short break$/);
     await page.getByTestId('timer-reset').click();
     await expect(page).toHaveTitle('Em Time');
   });

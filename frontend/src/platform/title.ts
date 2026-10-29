@@ -11,8 +11,9 @@ function titleFor(): string {
   const s = timerState.value;
   if (s.status === 'idle') return 'Em Time';
   const clock = formatClock(core.timer.remainingMs());
-  if (s.status === 'paused') return `Paused ${clock} · Em Time`;
-  return `${clock} · ${PHASE_NAMES[s.phase]} · Em Time`;
+  const phase = PHASE_NAMES[s.phase];
+  if (s.status === 'paused') return `Paused ${clock} · ${phase}`;
+  return `${clock} · ${phase}`;
 }
 
 function update(): void {

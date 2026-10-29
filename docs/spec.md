@@ -36,7 +36,7 @@ Every criterion has an ID. QA reports pass/fail per ID in `tests/qa-report.md`.
 - **TMR-11** Changing durations while a phase is running or paused does not change that phase. An idle phase at full duration updates immediately.
 - **TMR-12** Clicking a phase in the mode switcher while idle switches to that phase at full duration. While running or paused with at least 60 s elapsed in focus, a confirm dialog ("Discard this session?") appears first. Discarding logs nothing.
 - **TMR-13** Keyboard: `Space` play/pause, `S` skip, `R` reset, `1`/`2`/`3` select focus/short/long (same rules as TMR-12), `?` opens the shortcuts sheet. Shortcuts are ignored while typing in an input, textarea, select or contenteditable, and when Ctrl, Meta or Alt is held. `Space` on any other focused button or link keeps native behavior, except the three timer controls, where `Space` always means play/pause.
-- **TMR-14** Tab title while running: `24:13 · Focus · Em Time` (phase names: Focus, Short break, Long break). Paused: `Paused 24:13 · Em Time`. Idle: `Em Time`. Updates once per second while visible and at least once per minute while hidden.
+- **TMR-14** Tab title while running: `24:13 · Focus` (phase names: Focus, Short break, Long break; the app name is dropped so the time reads first on a taskbar button, changed 2026-10-29). Paused: `Paused 24:13 · Focus`. Idle: `Em Time`. Updates once per second while visible and at least once per minute while hidden.
 - **TMR-15** The timer state survives a reload, a closed tab, or a browser restart on the same device, applying EDGE-1 catch-up rules. Timer state is per device and never synced.
 - **TMR-16** While running, the ring shows a subtle breathing glow (focus only). With `prefers-reduced-motion: reduce` there is no breathing and no ring refill animation.
 - **TMR-17** While a phase runs on a device that supports the Screen Wake Lock API, the screen stays awake if "Keep screen on while running" is enabled (default on). The lock is released on pause, reset, phase end, or when the setting is turned off.
@@ -223,7 +223,7 @@ These replace earlier architect choices and are no longer open:
 - **D-28 Hash routing** (`#/timer` etc.) so GitHub Pages needs no 404 fallback. Auth uses the PKCE flow so the magic-link callback arrives as `?code=` and does not collide with hash routes.
 - **D-29 Update prompt, not auto-update,** and never while the timer runs.
 - **D-30 Shortcuts beyond the minimum:** `1`/`2`/`3` and `?`.
-- **D-31 Tab title format** `24:13 · Focus · Em Time`.
+- **D-31 Tab title format** `24:13 · Focus` (since 2026-10-29; was `24:13 · Focus · Em Time`).
 - **D-32 Inter Variable, self-hosted.**
 - **D-33 Timer digits weight 300** with tabular numerals.
 - **D-34 Erase all data** requires typing `erase`; signed in, it offers device-only or device-and-cloud.

@@ -335,3 +335,7 @@ Dathan asked for the time on the macOS menu bar and the Windows taskbar. A web a
 - Main JS 63.6 to 63.7 KB gzip.
 
 Not built, worth asking Dathan about: a Document Picture-in-Picture "pop out" (a tiny always-on-top window with the digits and Play/Pause, Chrome and Edge desktop only), which would cover the "pin it small" use better than a badge.
+
+## 2026-10-29, title without the app name
+
+Dathan: the countdown title is `16:42 · Focus` (paused: `Paused 16:42 · Focus`), no ` · Em Time`, so the time reads first on a Windows taskbar button. Idle stays `Em Time`. `platform/title.ts`, `timer.spec.ts` TMR-14 assertions, `docs/spec.md` TMR-14 and D-31 updated. Timer and pwa e2e green.
