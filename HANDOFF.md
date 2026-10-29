@@ -325,3 +325,13 @@ Dathan uses the installed Chrome app pinned as a small window. Four complaints: 
 **Tooling.** `scripts/shots.mjs <outDir> [tag]` screenshots the Timer at a list of window sizes (`SIZES=600x500,...`) against the :4173 preview and prints the bubble, pill, chip, stopwatch and Play boxes plus the scroll height. Use it after any Timer layout change.
 
 **Checks.** typecheck, lint, unit 834/834. E2E: layout, v5, stopwatch, keyboard, settings, timer, mascot, noise, friends: all green (655 passed, 35 skipped across the runs). Main JS 63.6 KB, CSS 13.0 KB gzip.
+
+## 2026-10-29, app icon badge (minutes left)
+
+Dathan asked for the time on the macOS menu bar and the Windows taskbar. A web app cannot write to the menu bar; what the platforms offer an installed PWA is the Badging API, a number on the app icon (Windows taskbar and Start, macOS Dock in Chrome and in Safari's "Add to Dock" apps, ChromeOS shelf). The window title already counts down (TMR-14) and shows in the Windows taskbar when buttons are not combined.
+
+- `platform/badge.ts`: `badgeFor(status, remainingMs)` (null when idle, else minutes left rounded up, at least 1) and `applyBadge(value)` (calls `navigator.setAppBadge` / `clearAppBadge` once per change, guarded, rejections swallowed). `platform/title.ts` `update()` applies it on the same once-a-second tick and on every timer state change, so it clears the moment the timer goes idle and changes once a minute otherwise. No setting: browsers ignore the call outside an installed app, so there is nothing to turn off in a tab.
+- Unit: `platform/badge.test.ts` (6). Not verified on a real installed app (headless Chromium has no icon); the API is called exactly as documented.
+- Main JS 63.6 to 63.7 KB gzip.
+
+Not built, worth asking Dathan about: a Document Picture-in-Picture "pop out" (a tiny always-on-top window with the digits and Play/Pause, Chrome and Edge desktop only), which would cover the "pin it small" use better than a badge.
