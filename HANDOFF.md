@@ -302,3 +302,26 @@ Dathan compared a "V6.1" desktop layout (controls inside the ring) and chose to 
 - Focus tools card is one row: Sounds chip + the same `StopwatchPill` the phone uses, styled as quiet pills on the solid card (`.side .swpill`, like `.side .nchip`). The card is `role="group"` named "Focus tools" (no visible heading). `StopwatchCard` and the stopwatch `.swatch*` rules in screens.css were removed; that `.swatch` rule also collided with the Tasks color swatch class (`components.css .swatch`) since v5, so Tasks swatches lose a stray top border/padding.
 - Timer mascot: `left: -92px` at 900 to 1199px (its painted right edge stays left of Reset at 900x700), `left: -150px; bottom: -44px` from 1200px (lower and further into the empty lower-left corner).
 - Tests: stopwatch.spec desktop assertions now match the pill (accessible names), v5.spec Focus tools card checks the group name, friends.spec adds "Focus tools fully visible at 1280x800 with friends shown". Note: e2e on :4173 serves `dist/`, so run `VITE_E2E=1 npm run build` before e2e after CSS changes or you test a stale build.
+
+## 2026-10-20, layout: window-size adaptation, Focus tools row, glass corners
+
+Dathan uses the installed Chrome app pinned as a small window. Four complaints: the ring never shrank, the Sounds chip and stopwatch pill stacked or sat offset at random, alignment drifted with the aspect ratio, and the selectors looked square-cornered in the installed app. CSS only (`screens.css`, `components.css`), no core, no markup, no test id change.
+
+**Ring takes the height that is left.** `.bubble` width is `clamp(--ring-min, min(76vw, 100dvh - --ring-chrome), --ring-max)`, with `--ring-chrome` the height of everything else on the Timer (greeting row, mode pill, controls, tool row, gaps, tab bar and page padding). Phone layout: 452px chrome, 120 to 296px ring (340 between 600 and 899px wide). Desktop: 330px chrome, 180 to 380px (was `min(380px, 46vh)`: 1280x800 now gets 380, not 368). At 390x844 and 360x740 nothing moved (same bubble, pill and control boxes as before, to the pixel).
+
+**Short-window tiers** (end of `screens.css`, after every other Timer rule; each trims features and lowers `--ring-chrome` by the same amount):
+- Phone layout, height <= 700: no cloud in the header, one-line greeting at `--em-fs-lg`, 10px gaps, play 56 / ghost buttons 44, tool row 44, and the message line and break card flow under the tool row (`.timerpage__aux` static) instead of hanging in the 140/170px reserved band. Chrome 346.
+- 640 to 700 tall (iPhone SE class): the full greeting row with the cloud is kept (it fits), chrome 378. 375x667 no longer scrolls (it scrolled 192px before).
+- Phone layout, height <= 480: greeting row and tool row hidden; mode pill, ring, controls and tab bar remain. Chrome 242. 420x420 and 844x390 fit without scrolling.
+- Desktop, height <= 620: 10px gaps, play 60, the cloud beside the ring hidden, side column gap 8. The side column still scrolls in a very short window (1000x480); the main column fits.
+- `@container (max-width: 210px)` on the bubble: task button 32px at `--em-fs-sm`, cycle dots hidden.
+
+**One column on the phone Timer.** `.timerpage__main`, the hanging band and the Friends card are `min(100%, var(--timer-col))` (400px) centred, so a wide-but-narrow window (700x900, a half-screen desktop window) keeps the greeting, cloud, pill, ring and tool row together instead of the cloud drifting to the far right.
+
+**Focus tools row is a fixed grid.** `.toolrow` (phone) and `.side--tools` (desktop card) are `grid-template-columns: minmax(0, 1fr) auto`: the stopwatch keeps its natural width, the Sounds chip fills the rest and ellipsizes its label; they can never wrap. Phone row is `min(100%, 340px)`, the same width as the mode pill above. Both pills are 46px (phone) / 44px (card) tall. `.swpill__time` min-width 5ch (was 3.2ch), so the pill does not change width until an hour. The desktop offset was the card rule `.card > * + * { margin-top: 12px }` hitting the second child; `.card.side--tools > * + * { margin-top: 0 }` fixes it.
+
+**Glass corners (not verified).** Dathan reported the selectors render square-cornered in the installed app; I could not reproduce it (a Chrome tab on his machine and headless Chromium both render them round) and his screenshot did not arrive. Applied the usual Chromium mitigation for a blurred backdrop losing its rounded clip: `isolation: isolate; transform: translateZ(0)` on `.seg, .chip, .nav, .nav__tabs, .nchip, .swpill, .iconbtn--ghost, .btn--secondary` (`components.css`, next to the glass block). If it still shows, the next things to try are explicit radii instead of `999px` on the glass pills, or moving the backdrop-filter to a `::before` with `overflow: hidden`.
+
+**Tooling.** `scripts/shots.mjs <outDir> [tag]` screenshots the Timer at a list of window sizes (`SIZES=600x500,...`) against the :4173 preview and prints the bubble, pill, chip, stopwatch and Play boxes plus the scroll height. Use it after any Timer layout change.
+
+**Checks.** typecheck, lint, unit 834/834. E2E: layout, v5, stopwatch, keyboard, settings, timer, mascot, noise, friends: all green (655 passed, 35 skipped across the runs). Main JS 63.6 KB, CSS 13.0 KB gzip.

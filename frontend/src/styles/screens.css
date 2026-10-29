@@ -69,16 +69,29 @@
   display: none;
 }
 /* Phone: greeting on top, modes at the bottom, and the ring, task, dots and controls centred in
-   the space between. Fills the viewport so there is no empty band under the page. */
+   the space between. Fills the viewport so there is no empty band under the page.
+   The ring takes the height that is left after everything else on the page (--ring-chrome: the
+   greeting row, mode pill, controls, tool row, one message line, gaps and the tab bar), so a short
+   window (a pinned desktop window, a small phone, landscape) gets a smaller ring instead of a
+   scrolling page. The short-window tiers at the end of this file lower --ring-chrome as they drop
+   features. */
 .timerpage {
   --timer-fill: calc(
     100dvh - var(--em-space-4) - 88px - env(safe-area-inset-top) - env(safe-area-inset-bottom)
   );
+  --ring-chrome: calc(452px + env(safe-area-inset-top) + env(safe-area-inset-bottom));
+  --ring-min: 120px;
+  --ring-max: 296px;
+  --timer-col: 400px; /* the phone Timer column: greeting, cloud, mode pill, ring, tool row, message band */
   padding-top: 6px; /* with the .view padding and the safe-area inset: the greeting clears the status bar */
   min-height: var(--timer-fill);
 }
+/* One centred column for everything on the phone Timer, so a wide-but-narrow window (a tablet, a
+   half-screen desktop window) keeps the greeting, cloud, mode pill, ring and tool row together. */
 .timerpage__main {
   min-height: 100%;
+  width: min(100%, var(--timer-col));
+  justify-self: center;
 }
 .controlswrap {
   position: relative;
@@ -92,7 +105,7 @@
   position: absolute;
   top: 100%;
   left: 50%;
-  width: min(calc(100vw - 2 * var(--em-gutter)), 460px);
+  width: min(calc(100vw - 2 * var(--em-gutter)), var(--timer-col));
   transform: translateX(-50%);
   margin-top: 8px;
   display: flex;
@@ -285,27 +298,32 @@
   }
 }
 
-/* Phone: Sounds and the stopwatch pill share one centred row under the play controls. */
+/* Phone: Sounds and the stopwatch pill share one row under the play controls, as wide as the mode
+   pill above. The row is a fixed two-column grid: the stopwatch keeps its natural width, the Sounds
+   chip takes what is left and ellipsizes its label, so the two never wrap or stack whatever the
+   chosen sound, the stopwatch reading or the window width. */
 .toolrow {
   --lg-ink: var(--lg-ink-low);
   --lg-base: var(--lg-fill), var(--lg-scrim-low);
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: center;
   gap: 10px;
-  max-width: 100%;
+  width: min(100%, 340px);
   margin-top: 10px;
 }
 .toolrow .nchip {
-  flex: 0 1 auto;
-  min-width: 46px;
+  width: 100%;
+  min-width: 0;
   min-height: 46px;
 }
 .swpill {
   display: inline-flex;
   align-items: center;
+  justify-self: end;
   flex: none;
   gap: 2px;
+  height: 46px;
   padding: 0 0 0 14px;
   border-radius: var(--em-radius-pill);
   background: var(--lg-base);
@@ -324,7 +342,7 @@
   margin-right: 6px;
 }
 .swpill__time {
-  min-width: 3.2ch;
+  min-width: 5ch; /* holds m:ss up to 59:59 without the pill changing width; it widens once at an hour */
   margin-right: 2px;
   font-size: var(--em-fs-sm);
   font-weight: var(--em-fw-heavy);
@@ -346,12 +364,16 @@
 /* Desktop: the Focus tools card holds the Sounds chip and the stopwatch pill on one row, as quiet
    pills on the solid card (not glass). */
 .side--tools {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  flex-wrap: wrap;
   gap: 10px;
 }
+.card.side--tools > * + * {
+  margin-top: 0; /* the card's stacked-children margin pushed the stopwatch 12px under the chip */
+}
 .side .swpill {
+  height: 44px;
   background: var(--em-surface-sunk);
   border-color: var(--em-border);
   -webkit-backdrop-filter: none;
@@ -368,7 +390,8 @@
   box-shadow: inset 0 0 0 1.5px var(--em-accent-text);
 }
 .side .nchip {
-  align-self: flex-start;
+  width: 100%;
+  min-width: 0;
   background: var(--em-surface-sunk);
   border-color: var(--em-border);
   -webkit-backdrop-filter: none;
@@ -443,7 +466,9 @@
 }
 .bubble {
   position: relative;
-  width: min(76vw, 296px);
+  --ring-fit: calc(100vh - var(--ring-chrome));
+  --ring-fit: calc(100dvh - var(--ring-chrome));
+  width: clamp(var(--ring-min), min(76vw, var(--ring-fit)), var(--ring-max));
   aspect-ratio: 1;
   border-radius: 50%;
   container-type: inline-size;
@@ -704,8 +729,16 @@
     flex: none;
   }
   .timerpage {
+    /* nav, greeting, mode pill, controls, the gaps between them and the page padding */
+    --ring-chrome: 330px;
+    --ring-min: 180px;
+    --ring-max: 380px;
     min-height: 0;
     padding-top: 0;
+  }
+  .timerpage__main {
+    width: auto;
+    justify-self: stretch;
   }
   .timerpage__mid,
   .controlswrap,
@@ -718,7 +751,7 @@
     gap: 12px;
   }
   .bubble {
-    width: min(380px, 46vh);
+    width: clamp(var(--ring-min), var(--ring-fit), var(--ring-max));
   }
   .timermascot {
     position: absolute;
@@ -1317,6 +1350,10 @@ a.fmini > .fmini__legend {
   .timerpage--friends .timerpage__main {
     min-height: calc(var(--timer-fill) - 6px); /* what the stretched row gave it, so the timer stays where it was */
   }
+  .timerpage--friends > .fmini {
+    justify-self: center;
+    width: min(100%, var(--timer-col));
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   a.fmini:hover {
@@ -1912,5 +1949,139 @@ input[type='range'] {
   .timermascot {
     left: -150px;
     bottom: -44px;
+  }
+}
+
+/* ---- short windows (a pinned desktop window, a small or landscape phone) ----
+   Each tier trims what is shown and lowers --ring-chrome by the same amount, so the ring keeps
+   taking the height that is left. Order matters: these come after every other Timer rule. */
+
+/* Phone layout in a wider window (a tablet, a half-screen desktop window): the ring may grow a little
+   past the phone cap when the height allows. */
+@media (min-width: 600px) and (max-width: 899px) {
+  .timerpage {
+    --ring-max: 340px;
+  }
+}
+
+/* Phone layout, under 700px tall: no cloud in the header, a one-line greeting, tighter gaps,
+   smaller play controls, and the message line and break card flow under the tool row instead of
+   hanging in a reserved band. */
+@media (max-width: 899px) and (max-height: 700px) {
+  .timerpage {
+    --ring-chrome: calc(346px + env(safe-area-inset-top) + env(safe-area-inset-bottom));
+    padding-top: 0;
+  }
+  .timerpage__main {
+    gap: 10px;
+  }
+  .thead {
+    min-height: 40px;
+  }
+  .thead > .thead__mascot {
+    display: none;
+  }
+  .greeting {
+    font-size: var(--em-fs-lg);
+    line-height: 26px;
+  }
+  .timerpage__mid {
+    gap: 10px;
+    padding-bottom: 0;
+  }
+  .timerpage__aux {
+    position: static;
+    width: 100%;
+    transform: none;
+    margin-top: 6px;
+  }
+  .controls {
+    gap: var(--em-space-4);
+  }
+  .controls .iconbtn {
+    width: 44px;
+    height: 44px;
+  }
+  .playbtn {
+    width: 56px;
+    height: 56px;
+  }
+  .toolrow {
+    margin-top: 8px;
+  }
+  .toolrow .nchip,
+  .toolrow .swpill {
+    min-height: 44px;
+    height: 44px;
+  }
+}
+
+/* Between 640 and 700px tall (an iPhone SE, say) the full greeting row with the cloud still fits
+   beside the ring, so keep it there; only the reserved band and the gaps go. */
+@media (max-width: 899px) and (min-height: 640px) and (max-height: 700px) {
+  .timerpage {
+    --ring-chrome: calc(378px + env(safe-area-inset-top) + env(safe-area-inset-bottom));
+  }
+  .thead {
+    min-height: 72px;
+  }
+  .thead > .thead__mascot {
+    display: block;
+  }
+  .greeting {
+    font-size: var(--em-fs-greet);
+    line-height: 30px;
+  }
+}
+
+/* Phone layout, under 480px tall: the greeting and the tool row go too; what is left is the mode
+   pill, the ring and the play controls. */
+@media (max-width: 899px) and (max-height: 480px) {
+  .timerpage {
+    --ring-chrome: calc(242px + env(safe-area-inset-top) + env(safe-area-inset-bottom));
+  }
+  .thead,
+  .toolrow {
+    display: none;
+  }
+}
+
+/* Desktop layout, under 620px tall: tighter gaps, smaller play controls, no cloud beside the ring. */
+@media (min-width: 900px) and (max-height: 620px) {
+  .timerpage {
+    --ring-chrome: 296px;
+  }
+  .timerpage__main {
+    gap: 10px;
+  }
+  .controls {
+    gap: var(--em-space-4);
+  }
+  .playbtn {
+    width: 60px;
+    height: 60px;
+  }
+  .bubblewrap > .timermascot {
+    display: none;
+  }
+  .timerpage__side {
+    gap: 8px;
+    padding-top: 4px;
+  }
+}
+
+/* Small rings: a lower task button and no cycle dots, so the centre of the ring stays clear. */
+@container (max-width: 210px) {
+  .ringcenter {
+    gap: 2px;
+  }
+  .taskbtn {
+    min-height: 32px;
+    padding: 0 8px;
+    font-size: var(--em-fs-sm);
+    line-height: 20px;
+  }
+  .dots {
+    display: none;
   }
 }

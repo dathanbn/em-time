@@ -33,6 +33,20 @@
   -webkit-backdrop-filter: blur(var(--em-blur)) saturate(140%);
   backdrop-filter: blur(var(--em-blur)) saturate(140%);
 }
+/* Chrome can paint the blurred backdrop of a rounded element with square corners when the element
+   shares a compositing layer with what animates behind it (seen in the installed app window on
+   Windows). Each blurred pill gets a layer of its own, so its clip stays rounded. */
+.seg,
+.chip,
+.nav,
+.nav__tabs,
+.nchip,
+.swpill,
+.iconbtn--ghost,
+.btn--secondary {
+  isolation: isolate;
+  transform: translateZ(0);
+}
 
 /* ---- buttons ---- */
 .btn {
